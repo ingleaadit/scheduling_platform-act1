@@ -19,7 +19,7 @@ Edit `src/prototype.html`, then run `node build.js`. That rewrites `app.css`, `a
 
 ## Plans
 
-A few features sit on a paid plan: the waitlist, insights, a new video link for each session and the payments export. Everything else is free, including the Google Calendar and WhatsApp Business connections. The plan switch under Practice, Account is a demo: no payment is taken and no price is set.
+A few features sit on a paid plan: the waitlist, insights, a new video link for each session, the payments export and automatic WhatsApp messages with no monthly limit. Everything else is free. That includes automatic email reminders, the Google Calendar connection, and the WhatsApp Business connection with 30 automatic messages a month; after 30, reminders go by email until the next month. The plan switch under Practice, Account is a demo: no payment is taken and no price is set.
 
 ## What it shows
 
