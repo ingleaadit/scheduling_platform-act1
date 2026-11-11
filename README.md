@@ -2,11 +2,24 @@
 
 A booking and admin tool for solo therapists and counsellors in India. This repository holds the clickable prototype. It is a single HTML file with no backend: all data is example data and stays in the browser that opens it.
 
+## The two pages
+
+- `index.html` is the client booking page. On the deployed site this is the root address.
+- `console.html` is the therapist console. On the deployed site this is `/console`.
+
+Each page fits itself to the screen: a phone gets the phone layout and a wider screen gets the desktop layout. Both pages read the same saved data in the browser, so a booking made on the client page shows up in the console when both are open in the same browser.
+
 ## Run it
 
-Open `index.html` in a browser. No build step and no server are needed.
+Open `index.html` or `console.html` in a browser. The console asks for a sign-in; the demo details are shown on the sign-in screen.
 
-The therapist console asks for a sign-in. The demo details are shown on the sign-in screen.
+## Change it
+
+Edit `src/prototype.html`, then run `node build.js`. That rewrites `app.css`, `app.js`, `index.html` and `console.html`. Commit all of them.
+
+## Plans
+
+A few features sit on a paid plan: the waitlist, insights, connected apps (Google Calendar, WhatsApp Business, a new video link per session) and the payments export. Everything else is free. The plan switch under Practice, Account is a demo: no payment is taken and no price is set.
 
 ## What it shows
 
