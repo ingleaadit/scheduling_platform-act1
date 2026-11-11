@@ -1,6 +1,6 @@
 # Scheduling platform (prototype)
 
-A booking and admin tool for solo therapists and counsellors in India. This repository holds the clickable prototype. It is a single HTML file with no backend: all data is example data and stays in the browser that opens it.
+A booking and admin tool for solo therapists and counsellors in India. This repository holds the clickable prototype. It has no backend: all data is example data and stays in the browser that opens it.
 
 ## The two pages
 
