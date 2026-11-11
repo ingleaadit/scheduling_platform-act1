@@ -495,7 +495,7 @@ function ensure(d){
   d.devices=d.devices||[{id:'d1',name:'Meera’s iPhone',kind:'Practice app for iPhone',push:true,last:Date.now()-20*6e4},{id:'d2',name:'Chrome on MacBook',kind:'Website, this browser',push:true,last:Date.now()}];
   return d}
 function meetCode(id){let h=7;for(const ch of String(id))h=(h*31+ch.charCodeAt(0))>>>0;const L='abcdefghijkmnopqrstuvwxyz';let s='';for(let i=0;i<10;i++){s+=L[h%25];h=Math.floor(h/25);if(h<25)h=(h+1)*977+i*131}return s.slice(0,3)+'-'+s.slice(3,7)+'-'+s.slice(7,10)}
-function videoFor(a){if(a.mode==='In person')return null;const s=D().settings;if(s.videoMode==='New link for each session'&&D().connect.gcal.on)return 'meet.google.com/'+meetCode(a.id);return s.room||null}
+function videoFor(a){if(a.mode==='In person')return null;const s=D().settings;if(s.videoMode==='New link for each session'&&D().connect.gcal.on&&paid())return 'meet.google.com/'+meetCode(a.id);return s.room||null}
 function payAmt(a){return a.pay&&a.pay.amount?a.pay.amount:(a.status==='held'?a.fee:(a.lateFee||a.fee))}
 const fakeUtr=n=>'6'+String((n*7919+31337)*104729%1e11).padStart(11,'0');
 const payLink=a=>'practice.example/pay/'+a.id;
@@ -883,7 +883,8 @@ function tProfile(){const s=D().settings;return `<div class="ttl"><div><h1>Profi
   <section class="panel sec"><h2 class="h2">Payments, video and check-ins</h2>
    ${field('upi','Your UPI ID','data.settings.upi',{req:false,hint:'Payment links open the client’s UPI app with your ID and the fee filled in.'})}
    ${chips('data.settings.videoMode',['Same link for everyone','New link for each session'],'Video link for online sessions')}
-   ${s.videoMode==='New link for each session'?(D().connect.gcal.on?'<p class="muted" style="margin:-6px 0 0;font-size:13px">Each session gets its own Google Meet link, sent only to that client.</p>':'<div class="note warn">Connect Google Calendar in Connected apps to create a link per session. Until then, your link below is used.</div>')
+   ${s.videoMode==='New link for each session'&&!paid()?'<div class="note warn">A new link for each session is on the paid plan. Until you switch, clients get your one link.</div>':''}
+   ${s.videoMode==='New link for each session'&&paid()?(D().connect.gcal.on?'<p class="muted" style="margin:-6px 0 0;font-size:13px">Each session gets its own Google Meet link, sent only to that client.</p>':'<div class="note warn">Connect Google Calendar in Connected apps to create a link per session. Until then, your link below is used.</div>')
      :'<div class="note warn"><b>Turn on a waiting room.</b> With one link for everyone, a client who joins early or reopens an old link can walk into someone else’s session. In Google Meet, turn off Quick access; in Zoom, turn on Waiting room. Then let each person in yourself.</div>'}
    ${field('room','Your video link','data.settings.room',{req:false})}
    <label class="tg"><span>Send a check-in with each reminder<small>One question and an optional note, sent automatically the day before. Only you see the answer.</small></span><input type="checkbox" class="tgl" data-f="data.settings.checkin" ${s.checkin?'checked':''}></label></section>
@@ -968,8 +969,8 @@ function tApps(){const g=D().connect.gcal,w=D().connect.wa;const tg=(path,t,sub,
 
 /* plans: a few existing features sit on the paid plan */
 const paid=()=>D().settings.plan==='Paid';
-const PAID_TABS={waitlist:['Waitlist','Offer a cancelled slot to the people waiting for one, in one tap.'],insights:['Insights','Attendance, no-show and income figures built from your session labels.'],apps:['Connected apps','Google Calendar sync, WhatsApp Business sending and a new video link for each session.']};
-function planList(){const cur=D().settings.plan;return `<div class="plans"><div class="${cur==='Free'?'cur':''}"><h3>Free${cur==='Free'?' · your plan':''}</h3><ul><li>Booking page and link</li><li>Calendar, hours, breaks and blocked time</li><li>Recurring sessions</li><li>Intake and consent forms</li><li>WhatsApp reminders and UPI requests you send yourself</li><li>Session labels, client pages and client import</li><li>Training log and supervision tags</li></ul></div><div class="${cur==='Paid'?'cur':''}"><h3>Paid${cur==='Paid'?' · your plan':''}</h3><ul><li>Everything in Free</li><li>Waitlist, with offers for cancelled slots</li><li>Insights</li><li>Google Calendar and WhatsApp Business connection</li><li>A new video link for each session</li><li>Payments export as a CSV file</li></ul></div></div>`}
+const PAID_TABS={waitlist:['Waitlist','Offer a cancelled slot to the people waiting for one, in one tap.'],insights:['Insights','Attendance, no-show and income figures built from your session labels.']};
+function planList(){const cur=D().settings.plan;return `<div class="plans"><div class="${cur==='Free'?'cur':''}"><h3>Free${cur==='Free'?' · your plan':''}</h3><ul><li>Booking page and link</li><li>Calendar, hours, breaks and blocked time</li><li>Recurring sessions</li><li>Intake and consent forms</li><li>WhatsApp reminders and UPI requests you send yourself</li><li>Session labels, client pages and client import</li><li>Training log and supervision tags</li><li>Google Calendar and WhatsApp Business connection</li></ul></div><div class="${cur==='Paid'?'cur':''}"><h3>Paid${cur==='Paid'?' · your plan':''}</h3><ul><li>Everything in Free</li><li>Waitlist, with offers for cancelled slots</li><li>Insights</li><li>A new video link for each session</li><li>Payments export as a CSV file</li></ul></div></div>`}
 function planPanel(){const cur=D().settings.plan;return `<section class="panel sec"><h2 class="h2">Plan</h2>${planList()}<div class="acts"><button class="${cur==='Paid'?'btn2':'btn'}" data-a="plan" data-v="${cur==='Paid'?'Free':'Paid'}" style="height:44px;font-size:15px;padding:0 18px">${cur==='Paid'?'Switch back to Free':'Switch to the paid plan'}</button></div><p class="muted" style="margin:0;font-size:13px">This switch is a demo. No payment is taken and the price is not set yet.</p></section>`}
 function paywall(tb){const [n,dsc]=PAID_TABS[tb];return `<div class="ttl"><div><h1>${n}</h1><p>This is part of the paid plan.</p></div></div><div class="note warn">${dsc}</div>${planPanel()}`}
 /* three places: Today, People, Practice */
@@ -1177,7 +1178,7 @@ function act(a,el){const ds=el.dataset,c=S.c,d=D();if(a!=='calMenu')S.t.calMenu=
     if(!ids.length){S.t.tab='people';S.t.person=name}
     S.modal=ids.length&&m.notify&&wa&&starts[0]>Date.now()?{kind:'apSent',id:ids[0],n:ids.length,step}:null;break}
   case 'paycsv':if(!paid()){S.t.tab='more';toast('Payments export is on the paid plan');break}S.modal={kind:'paycsv'};break;
-  case 'plan':d.settings.plan=ds.v==='Paid'?'Paid':'Free';save();toast(d.settings.plan==='Paid'?'Paid plan on. Waitlist, Insights and Connected apps are unlocked.':'Back on the Free plan');break;
+  case 'plan':d.settings.plan=ds.v==='Paid'?'Paid':'Free';save();toast(d.settings.plan==='Paid'?'Paid plan on. Waitlist and Insights are unlocked.':'Back on the Free plan');break;
   case 'apWaive':{const x=d.appts.find(y=>y.id===ds.id);x.waived=!x.waived;x.paid=false;save();toast(x.waived?'Fee waived':'Fee charged');break}
   case 'dismissFreed':S.t.freed=null;save();break;
   case 'addBlock':{const b=S.t.blk;if(b.from>=b.to){toast('End time must be after the start time');return}d.blocks.push({id:'b'+Date.now(),date:Number(b.date),from:b.from,to:b.to,note:b.note.trim()});b.note='';save();toast('Time blocked');break}
