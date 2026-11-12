@@ -113,7 +113,11 @@ const PALS=[
   {id:'mulberry',name:'Mulberry',l:'#9D4F6E',d:'#BF889F',s:'#F5EAEE',h:'#390E20',hd:'#E4B9BA'},{id:'ocean',name:'Ocean',l:'#1F6A8A',d:'#74B9D6'},{id:'indigo',name:'Indigo',l:'#3F51B5',d:'#A3ACF2'},
   {id:'plum',name:'Plum',l:'#6B3E75',d:'#C9A0D3'},{id:'rose',name:'Rose',l:'#A23B5B',d:'#EE9DB5'},{id:'terracotta',name:'Terracotta',l:'#A0472F',d:'#EA9E86'},
   {id:'saffron',name:'Saffron',l:'#8F5400',d:'#F0BA66'},{id:'forest',name:'Forest',l:'#3A6B35',d:'#9FCD92'},{id:'teal',name:'Teal',l:'#006D77',d:'#62C7D0'},
-  {id:'midnight',name:'Midnight',l:'#2B3A67',d:'#A2B4EA'},{id:'slate',name:'Slate',l:'#44546A',d:'#AFBDD0'},{id:'graphite',name:'Graphite',l:'#1D1D1F',d:'#EDEDF0'}];
+  {id:'midnight',name:'Midnight',l:'#2B3A67',d:'#A2B4EA'},{id:'slate',name:'Slate',l:'#44546A',d:'#AFBDD0'},{id:'graphite',name:'Graphite',l:'#1D1D1F',d:'#EDEDF0'},
+  {id:'umber',name:'Umber',l:'#582F0E',d:'#C2C5AA'},
+  {id:'inksand',name:'Ink & Sand',l:'#0A0908',d:'#EAE0D5'},
+  {id:'lagoon',name:'Lagoon',l:'#0B2027',d:'#F6F1D1'},
+  {id:'ember',name:'Ember',l:'#540B0E',d:'#FFF3B0'}];
 
 const LIVE=window.APP_SIDE==='client'||window.APP_SIDE==='therapist'?window.APP_SIDE:'';
 let S=fresh();
