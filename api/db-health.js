@@ -13,7 +13,8 @@ function getPool() {
   if (!pool) {
     pool = new Pool({
       connectionString: connectionString(),
-      ssl: { rejectUnauthorized: true }, // Supabase requires TLS
+      // Supabase requires TLS. SUPABASE_CA_CERT holds Supabase's root CA (PEM) so Node can verify the chain.
+      ssl: { rejectUnauthorized: true, ca: process.env.SUPABASE_CA_CERT || undefined },
       max: 1,
     });
   }
