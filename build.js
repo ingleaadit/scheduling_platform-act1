@@ -15,6 +15,10 @@ const body = src.slice(cssEnd + '</style>'.length, jsStart).trim();
 const js = src.slice(jsStart + '<script>'.length, jsEnd).trim() + '\n';
 const fontLink = (src.slice(0, cssStart).match(/<link rel="stylesheet"[^>]*>/) || [''])[0];
 
+// The therapist console signs in with Supabase, so it also loads the Supabase browser library and config.js.
+fs.copyFileSync('node_modules/@supabase/supabase-js/dist/umd/supabase.js', 'supabase.js');
+const authScripts = '<script src="supabase.js"></script>\n<script src="config.js"></script>\n';
+
 const page = (side, title) => `<!doctype html>
 <html lang="en">
 <head>
@@ -26,7 +30,7 @@ ${fontLink}
 </head>
 <body>
 ${body}
-<script>window.APP_SIDE='${side}'</script>
+${side === 'therapist' ? authScripts : ''}<script>window.APP_SIDE='${side}'</script>
 <script src="app.js"></script>
 </body>
 </html>

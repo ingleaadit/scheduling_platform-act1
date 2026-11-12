@@ -503,7 +503,7 @@ const checkLink=a=>'practice.example/c/'+a.id;
 function payText(a){const amt=due(a)||a.fee;return `Hi ${firstName(a.name)}, ${a.status==='held'?'thank you for the session on '+fD(a.start)+'. The fee is '+money(amt):'the late cancellation fee for '+fD(a.start)+' is '+money(amt)}. You can pay by UPI here: https://${payLink(a)}\nOr pay to UPI ID ${D().settings.upi}.`}
 function newClient(){return {step:'intro',mode:'Online',type:'first',day:null,slot:null,d:{fn:'',ln:'',email:'',wa:''},a:{},g:{name:'',rel:'',wa:''},agree:false,err:{},booked:null,resched:null,cancelAsk:false,cancelReason:'',wl:{fn:'',ln:'',wa:'',days:'Weekdays',times:'Evenings after 6',type:'first'},wlDone:false}}
 function fresh(){return {view:'client',device:'desktop',c:newClient(),t:{tab:'schedule',apFilter:'upcoming',hide:false,freed:null,period:90,blk:{date:'',from:'17:00',to:'18:00',note:''},sv:{date:'',hours:'1',sup:'',kind:'Individual',note:''},svc:{},wadd:{name:'',wa:'',pref:''}},modal:null,data:ensure(seed()),auth:false,login:newLogin()}}
-function newLogin(){return {mode:'email',email:'',pw:'',phone:'',otp:'',sent:false,err:'',note:''}}
+function newLogin(){return {mode:'email',email:'',pw:'',pw2:'',phone:'',otp:'',sent:false,err:'',note:'',busy:false}}
 const DEMO_EMAIL='demo@practice.test',DEMO_PW='Practice2026',DEMO_OTP='123456';
 const PALS=[
   {id:'neem',name:'Earthy Forest',l:'#3A5A40',d:'#A3B18A'},
@@ -523,6 +523,30 @@ const PALS=[
   {id:'ember',name:'Ember',l:'#540B0E',d:'#FFF3B0'}];
 
 const LIVE=window.APP_SIDE==='client'||window.APP_SIDE==='therapist'?window.APP_SIDE:'';
+/* Real sign-in (deployed console only). Everywhere else the prototype keeps its demo login. */
+const HASH0=location.hash;
+const FROM_LINK=/type=(invite|recovery)/.test(HASH0)&&/access_token=/.test(HASH0);
+if(LIVE==='client'&&FROM_LINK){location.replace('/console'+HASH0)}
+let SB=null;
+try{if(LIVE==='therapist'&&window.supabase&&window.SUPABASE_URL&&window.SUPABASE_PUBLISHABLE_KEY)SB=window.supabase.createClient(window.SUPABASE_URL,window.SUPABASE_PUBLISHABLE_KEY)}catch(e){SB=null}
+function sbLogin(L){
+  if(L.busy)return;
+  if(L.mode==='setpw'){
+    if(L.pw.length<10){L.err='Use at least 10 characters';return}
+    if(L.pw!==L.pw2){L.err='The two passwords don’t match';return}
+    L.err='';L.busy=true;
+    SB.auth.updateUser({password:L.pw}).then(({error})=>{L.busy=false;
+      if(error){L.err='Could not set the password. The link may have expired. Ask for a new one.'}
+      else{S.auth=true;S.login=newLogin();toast('Password set. You are signed in.')}
+      render()});
+    return}
+  if(!L.email.trim()||!L.pw){L.err='Enter your email and password';return}
+  L.err='';L.busy=true;
+  SB.auth.signInWithPassword({email:L.email.trim(),password:L.pw}).then(({error})=>{L.busy=false;
+    if(error){L.err='That email and password don’t match.'}
+    else{S.auth=true;S.login=newLogin();toast('Signed in')}
+    render()});
+}
 let S=fresh();
 try{S.auth=localStorage.getItem(KEY+'-auth')==='1'}catch(e){}
 try{const raw=localStorage.getItem(KEY);if(raw){const p=JSON.parse(raw);if(p&&p.data&&p.data.appts&&p.v===1){S.data=ensure(p.data);if(p.t)Object.assign(S.t,p.t)}}}catch(e){}
@@ -586,7 +610,7 @@ function render(){
   const key=S.view+S.device+(S.view==='client'?S.c.step:(S.auth?S.t.tab+(S.t.person||''):'login'));
   const sc=document.querySelector('#stage .scr');const keep=key===lastKey?(sc?sc.scrollTop:window.scrollY):null;
   const isM=S.device==='phone';
-  const inner=S.view==='client'?(isM?clientPhone():clientDesk()):!S.auth?signIn(isM):(isM?therPhone():therDesk());
+  const inner=S.view==='client'?(isM?clientPhone():clientDesk()):(SB&&!S.sbReady)?'<div class="scr"><p class="muted" style="padding:40px">Loading…</p></div>':!S.auth?signIn(isM):(isM?therPhone():therDesk());
   const modal=S.modal?renderModal():'';
   const stage=document.getElementById('stage');
   rendering=true;try{const fe=document.activeElement;if(fe&&stage.contains(fe)&&fe.blur)fe.blur()}finally{rendering=false}
@@ -720,26 +744,27 @@ function valAbout(){const e={},s=D().settings;D().intake.forEach(q=>{const v=Str
   if(minor()){if(!s.minors)e.age='Bookings are for clients aged 18 and over';else{if(!S.c.g.name.trim())e.gname='Enter their name';if(!S.c.g.rel.trim())e.grel='Say how they are related to you';if(S.c.g.wa.replace(/\D/g,'').length!==10)e.gwa='Enter a 10-digit number'}}return e}
 
 /* ------------- sign-in ------------- */
-function signIn(m){const L=S.login;
+function signIn(m){const L=S.login;const real=!!SB;
   const form=`<form class="auth-form" data-form="login" novalidate ${m?'style="padding:24px 22px 32px;justify-content:flex-start"':''}>
-    <div><h1 style="font-size:${m?'30px':'36px'};font-weight:700">Sign in</h1><p class="muted" style="margin:6px 0 0;font-size:16px">to your practice console</p></div>
-    <button type="button" class="prov" data-a="provider" data-v="Apple"><i aria-hidden="true">A</i>Continue with Apple</button>
+    <div><h1 style="font-size:${m?'30px':'36px'};font-weight:700">${L.mode==='setpw'?'Set your password':'Sign in'}</h1><p class="muted" style="margin:6px 0 0;font-size:16px">${L.mode==='setpw'?'to finish setting up your account':'to your practice console'}</p></div>
+    ${real?'':`<button type="button" class="prov" data-a="provider" data-v="Apple"><i aria-hidden="true">A</i>Continue with Apple</button>
     <button type="button" class="prov" data-a="provider" data-v="Google"><i aria-hidden="true">G</i>Continue with Google</button>
-    <button type="button" class="prov" data-a="provider" data-v="Facebook"><i aria-hidden="true">f</i>Continue with Facebook</button>
+    <button type="button" class="prov" data-a="provider" data-v="Facebook"><i aria-hidden="true">f</i>Continue with Facebook</button>`}
     ${L.note?`<div class="note warn" role="status">${esc(L.note)}</div>`:''}
-    <div class="or">or</div>
-    ${L.mode==='email'?`${field('le','Email','login.email',{type:'email',req:false,ac:'username',ph:'you@example.com'})}${field('lp','Password','login.pw',{type:'password',req:false,ac:'current-password'})}
-      ${L.err?`<span class="err" role="alert">${esc(L.err)}</span>`:''}<button type="submit" class="btn full">Sign in</button>
-      <div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap"><button type="button" class="linkbtn" style="padding:0" data-a="forgot">Forgot password?</button><button type="button" class="linkbtn" style="padding:0" data-a="lmode" data-v="phone">Use phone number instead</button></div>`
+    ${real?'':'<div class="or">or</div>'}
+    ${L.mode==='setpw'?`${field('lp','New password','login.pw',{type:'password',req:false,ac:'new-password',hint:'At least 10 characters'})}${field('lp2','Repeat password','login.pw2',{type:'password',req:false,ac:'new-password'})}
+      ${L.err?`<span class="err" role="alert">${esc(L.err)}</span>`:''}<button type="submit" class="btn full" ${L.busy?'disabled':''}>${L.busy?'Saving…':'Save password'}</button>`:L.mode==='email'?`${field('le','Email','login.email',{type:'email',req:false,ac:'username',ph:'you@example.com'})}${field('lp','Password','login.pw',{type:'password',req:false,ac:'current-password'})}
+      ${L.err?`<span class="err" role="alert">${esc(L.err)}</span>`:''}<button type="submit" class="btn full" ${L.busy?'disabled':''}>${L.busy?'Signing in…':'Sign in'}</button>
+      <div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap"><button type="button" class="linkbtn" style="padding:0" data-a="forgot">Forgot password?</button>${real?'':`<button type="button" class="linkbtn" style="padding:0" data-a="lmode" data-v="phone">Use phone number instead</button>`}</div>`
     :`${field('lph','Mobile number','login.phone',{type:'tel',mode:'numeric',req:false,pre:'+91',ac:'tel-national'})}${L.sent?field('lotp','6-digit code','login.otp',{mode:'numeric',req:false,ac:'one-time-code',hint:'Sent by SMS to +91 '+L.phone}):''}
       ${L.err?`<span class="err" role="alert">${esc(L.err)}</span>`:''}<button type="submit" class="btn full">${L.sent?'Verify and sign in':'Send code'}</button>
       <button type="button" class="linkbtn" style="padding:0;align-self:flex-start" data-a="lmode" data-v="email">Use email and password instead</button>`}
-    <div class="note soft" style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap"><span><b>Demo login</b><br><span class="muted">${L.mode==='email'?`${DEMO_EMAIL} · ${DEMO_PW}`:`Any 10-digit number · code ${DEMO_OTP}`}</span></span><button type="button" class="mini w" data-a="fillDemo">Fill it in</button></div>
-    <p class="muted" style="margin:0;font-size:13px">New to Practice? <button type="button" class="linkbtn" style="padding:0;font-size:13px" data-a="signup">Create an account</button></p>
+    ${real?'':`<div class="note soft" style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap"><span><b>Demo login</b><br><span class="muted">${L.mode==='email'?`${DEMO_EMAIL} · ${DEMO_PW}`:`Any 10-digit number · code ${DEMO_OTP}`}</span></span><button type="button" class="mini w" data-a="fillDemo">Fill it in</button></div>`}
+    ${real?'<p class="muted" style="margin:0;font-size:13px">Access is by invitation only.</p>':`<p class="muted" style="margin:0;font-size:13px">New to Practice? <button type="button" class="linkbtn" style="padding:0;font-size:13px" data-a="signup">Create an account</button></p>`}
   </form>`;
   if(m)return `<header class="mhead" style="background:var(--accent);color:var(--accent-ink);border:0"><b>Practice</b><span style="font-size:13px">Console</span></header><div class="scr">${form}</div>`;
   return `<div class="auth"><div class="auth-brand"><b style="font-size:18px">Practice</b><div class="sec" style="gap:22px"><h2 style="font-size:clamp(30px,3.6cqi,44px);font-weight:700;line-height:1.1">Your practice, in one place.</h2>
-    <ul><li>Bookings, intake and consent from one link</li><li>Waitlist that refills cancelled slots</li><li>Training log for client and supervision hours</li><li>Names hidden on shared screens</li></ul></div><span style="font-size:13px;opacity:.85">Prototype. Sign-in details stay in this browser.</span></div>${form}</div>`}
+    <ul><li>Bookings, intake and consent from one link</li><li>Waitlist that refills cancelled slots</li><li>Training log for client and supervision hours</li><li>Names hidden on shared screens</li></ul></div><span style="font-size:13px;opacity:.85">${real?'Access is by invitation only.':'Prototype. Sign-in details stay in this browser.'}</span></div>${form}</div>`}
 
 /* ------------- therapist ------------- */
 const TABS=[['schedule','Schedule'],['appts','Appointments'],['insights','Insights'],['payments','Payments'],['waitlist','Waitlist'],['log','Training log'],['messages','Messages'],['hours','Hours'],['profile','Profile'],['apps','Connected apps']];
@@ -1148,15 +1173,18 @@ function act(a,el){const ds=el.dataset,c=S.c,d=D();if(a!=='calMenu')S.t.calMenu=
   case 'find':S.modal={kind:'find',q:''};setTimeout(()=>{const i=document.getElementById('findq');if(i)i.focus()},60);break;
   case 'hide':S.t.hide=!S.t.hide;save();break;
   case 'previewClient':if(LIVE){window.open('index.html','_blank','noopener');break}S.view='client';S.c=newClient();setHash();break;
-  case 'logout':S.auth=false;S.login=newLogin();S.modal=null;S.t.tab='schedule';save();toast('Logged out');break;
+  case 'logout':if(SB)SB.auth.signOut();S.auth=false;S.login=newLogin();S.modal=null;S.t.tab='schedule';save();toast('Logged out');break;
   case 'colours':S.modal={kind:'colours'};break;
   case 'pal':d.settings.palette=ds.v;save();break;
   case 'provider':S.login.note=ds.v+' sign-in isn’t connected in this prototype. Use the demo login below.';S.login.err='';break;
-  case 'forgot':S.login.note='Password reset isn’t set up in this prototype. Use the demo login below.';break;
+  case 'forgot':if(SB){const em=S.login.email.trim();if(!em){S.login.note='Type your email above, then tap Forgot password.';break}
+    S.login.note='Sending…';SB.auth.resetPasswordForEmail(em,{redirectTo:location.origin+'/console'}).then(()=>{S.login.note='If that email has an account, a reset link is on its way.';render()});break}
+    S.login.note='Password reset isn’t set up in this prototype. Use the demo login below.';break;
   case 'signup':S.login.note='Sign-up isn’t set up in this prototype. Use the demo login below.';break;
   case 'lmode':S.login.mode=ds.v;S.login.err='';S.login.sent=false;break;
   case 'fillDemo':if(S.login.mode==='email'){S.login.email=DEMO_EMAIL;S.login.pw=DEMO_PW}else{if(S.login.phone.replace(/\D/g,'').length!==10)S.login.phone='90000 12345';S.login.sent=true;S.login.otp=DEMO_OTP}S.login.err='';break;
   case 'login':{const L=S.login;L.note='';
+    if(SB){sbLogin(L);break}
     if(L.mode==='email'){if(!L.email.trim()||!L.pw){L.err='Enter your email and password';break}if(L.email.trim().toLowerCase()!==DEMO_EMAIL||L.pw!==DEMO_PW){L.err='That email and password don’t match. Try the demo login below.';break}}
     else{if(L.phone.replace(/\D/g,'').length!==10){L.err='Enter a 10-digit mobile number';break}if(!L.sent){L.sent=true;L.err='';toast('Code sent. In this demo it is '+DEMO_OTP);break}if(L.otp.trim()!==DEMO_OTP){L.err='That code is wrong. In this demo it is '+DEMO_OTP;break}}
     S.auth=true;S.login=newLogin();save();toast('Signed in as '+P().name);break}
@@ -1264,6 +1292,12 @@ window.addEventListener('hashchange',()=>{readHash();S.modal=null;render()});
 if(LIVE){document.body.classList.add('live');document.getElementById('livebar').hidden=false;if(LIVE==='therapist')document.getElementById('livereset').hidden=false;
   window.addEventListener('resize',()=>{const dv=window.innerWidth<700?'phone':'desktop';if(dv!==S.device){S.device=dv;S.modal=null;render()}});
   window.addEventListener('storage',e=>{if(e.key!==KEY||!e.newValue)return;try{const p=JSON.parse(e.newValue);if(p&&p.data){S.data=p.data;ensure(S.data);const tg=(document.activeElement||{}).tagName||'';if(!S.modal&&!/INPUT|TEXTAREA|SELECT/.test(tg))render()}}catch(_){}})}
+if(SB){S.auth=false;
+  SB.auth.getSession().then(({data})=>{S.sbReady=true;S.auth=!!(data&&data.session);
+    if(S.auth&&FROM_LINK){S.auth=false;S.login.mode='setpw'}
+    render()});
+  SB.auth.onAuthStateChange(ev=>{if(ev==='SIGNED_OUT'&&S.auth){S.auth=false;render()}});
+}
 readHash();render();
 })();
 </script>
