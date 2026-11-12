@@ -9,13 +9,13 @@ function req(method = 'GET') { const r = new EventEmitter(); r.method = method; 
 test('returns 405 for POST', async () => {
   const r = res(); await handler(req('POST'), r); assert.strictEqual(r.statusCode, 405);
 });
-test('returns 500 when DATABASE_URL is missing', async () => {
-  delete process.env.DATABASE_URL;
+test('returns 500 when no connection string is set', async () => {
+  delete process.env.DATABASE_URL; delete process.env.POSTGRES_URL;
   const r = res(); await handler(req(), r); assert.strictEqual(r.statusCode, 500);
   assert.ok(!r.body.includes('postgres'), 'must not echo connection details');
 });
 test('returns 503 without leaking details when the database is unreachable', async () => {
-  process.env.DATABASE_URL = 'postgresql://user:secret@127.0.0.1:1/none';
+  delete process.env.POSTGRES_URL; process.env.DATABASE_URL = 'postgresql://user:secret@127.0.0.1:1/none';
   const r = res(); await handler(req(), r);
   assert.strictEqual(r.statusCode, 503);
   assert.ok(!r.body.includes('secret'));

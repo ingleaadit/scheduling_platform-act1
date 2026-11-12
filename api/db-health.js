@@ -2,11 +2,17 @@
 // Runs only on the server: DATABASE_URL (which contains the database password) is read from Vercel environment variables, never sent to the browser.
 const { Pool } = require('pg');
 
+// Prefer POSTGRES_URL, which the Supabase Vercel integration sets with a working pooler host.
+// DATABASE_URL is the fallback.
+function connectionString() {
+  return process.env.POSTGRES_URL || process.env.DATABASE_URL;
+}
+
 let pool;
 function getPool() {
   if (!pool) {
     pool = new Pool({
-      connectionString: process.env.DATABASE_URL,
+      connectionString: connectionString(),
       ssl: { rejectUnauthorized: true }, // Supabase requires TLS
       max: 1,
     });
@@ -19,9 +25,9 @@ async function handler(req, res) {
     res.statusCode = 405;
     return res.end('Method not allowed');
   }
-  if (!process.env.DATABASE_URL) {
+  if (!connectionString()) {
     res.statusCode = 500;
-    return res.end('DATABASE_URL is not configured');
+    return res.end('No database connection string is configured');
   }
   try {
     const r = await getPool().query('select now() as server_time');
