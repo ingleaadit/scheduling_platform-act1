@@ -4,8 +4,19 @@ const { Pool } = require('pg');
 
 // Prefer POSTGRES_URL, which the Supabase Vercel integration sets with a working pooler host.
 // DATABASE_URL is the fallback.
+// The integration's URL carries sslmode=require, and pg then ignores our ssl option (including the CA).
+// Remove sslmode (and the integration's "supa" flag) so the explicit ssl settings below apply.
 function connectionString() {
-  return process.env.POSTGRES_URL || process.env.DATABASE_URL;
+  const raw = process.env.POSTGRES_URL || process.env.DATABASE_URL;
+  if (!raw) return raw;
+  try {
+    const u = new URL(raw);
+    u.searchParams.delete('sslmode');
+    u.searchParams.delete('supa');
+    return u.toString();
+  } catch (e) {
+    return raw;
+  }
 }
 
 let pool;
