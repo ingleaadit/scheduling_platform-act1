@@ -37,7 +37,8 @@ async function handler(req, res) {
     return res.end(JSON.stringify({ ok: true, server_time: r.rows[0].server_time }));
   } catch (e) {
     // Log the error class only: driver messages can echo connection details.
-    console.error('db-health failed', e.code || e.name);
+    // Also log whether the CA variable is present (true/false only, never its value).
+    console.error('db-health failed', e.code || e.name, 'ca_set=' + Boolean(process.env.SUPABASE_CA_CERT));
     res.statusCode = 503;
     return res.end(JSON.stringify({ ok: false }));
   }
