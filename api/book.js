@@ -4,21 +4,7 @@ const crypto = require('crypto');
 const { getPool } = require('./_lib/db');
 const { confirmationEmail, therapistEmail, sendMail } = require('./_lib/mail');
 
-const str = (v, max) => String(v == null ? '' : v).trim().slice(0, max);
-const mins = (hm) => { const [h, m] = String(hm).split(':').map(Number); return h * 60 + m; };
-const DAY = 864e5;
-
-// Is the slot inside working hours and clear of blocked time? Uses the practice's own clock (tzOff, minutes from UTC as JavaScript reports it).
-function slotAllowed(data, start, dur) {
-  const off = (Number(data.tzOff) || 0) * 60000;
-  const local = new Date(start - off);
-  const wd = local.getUTCDay();
-  const m = local.getUTCHours() * 60 + local.getUTCMinutes();
-  const inHours = ((data.hours || {})[wd] || []).some(([f, t]) => m >= mins(f) && m + dur <= mins(t));
-  if (!inHours) return false;
-  const day = Math.floor((start - off) / DAY);
-  return !(data.blocks || []).some((b) => Math.floor((Number(b.date) - off) / DAY) === day && m < mins(b.to) && m + dur > mins(b.from));
-}
+const { DAY, str, sha, slotAllowed, ipHash, overLimit, siteUrl } = require('./_lib/slots');
 
 function buildBooking(data, body) {
   const fn = str(body.fn, 60), ln = str(body.ln, 60), email = str(body.email, 120), wa = str(body.wa, 20).replace(/\D/g, '');
@@ -55,6 +41,8 @@ module.exports = async (req, res) => {
   if (!body || JSON.stringify(body).length > 30000) return res.status(400).json({ ok: false, error: 'details' });
   const slug = str(body.t, 60).toLowerCase();
   if (!/^[a-z0-9-]{3,60}$/.test(slug)) return res.status(404).json({ ok: false });
+  // A hidden field that people never see or fill. Scripts that fill every field give themselves away; they get a plain "ok" and nothing is stored.
+  if (str(body.hp, 200)) return res.status(200).json({ ok: true });
 
   let client;
   try {
@@ -62,11 +50,13 @@ module.exports = async (req, res) => {
     const p = await client.query('select practitioner_id, data from public.practice_public where slug = $1', [slug]);
     if (!p.rows.length) return res.status(404).json({ ok: false });
     const pid = p.rows[0].practitioner_id, data = p.rows[0].data || {};
+    const ip = ipHash(req, pid);
 
     if (body.kind === 'waitlist') {
       const w = buildWaitlist(data, body);
       if (w.error) return res.status(400).json({ ok: false, error: w.error });
-      await client.query("insert into public.booking_inbox (id, practitioner_id, kind, payload) values ($1, $2, 'waitlist', $3)", [w.id, pid, JSON.stringify(w.entry)]);
+      if (await overLimit(client, pid, ip, '')) return res.status(429).json({ ok: false, error: 'limit' });
+      await client.query("insert into public.booking_inbox (id, practitioner_id, kind, payload, ip_hash) values ($1, $2, 'waitlist', $3, $4)", [w.id, pid, JSON.stringify(w.entry), ip]);
       return res.status(200).json({ ok: true });
     }
 
@@ -78,11 +68,15 @@ module.exports = async (req, res) => {
     await client.query('select pg_advisory_xact_lock(hashtext($1::text))', [pid]);
     const taken = (data.busy || []).some(([s, e]) => b.start < e && b.end > s);
     const pending = await client.query(
-      "select 1 from public.booking_inbox where practitioner_id = $1 and kind = 'booking' and imported_at is null and starts_at < $3 and ends_at > $2 limit 1",
+      "select 1 from public.booking_inbox where practitioner_id = $1 and kind in ('booking', 'reschedule') and imported_at is null and cancelled_at is null and starts_at < $3 and ends_at > $2 limit 1",
       [pid, new Date(b.start).toISOString(), new Date(b.end).toISOString()]);
     if (taken || pending.rows.length) { await client.query('rollback'); return res.status(409).json({ ok: false, error: 'slot' }); }
-    await client.query("insert into public.booking_inbox (id, practitioner_id, kind, starts_at, ends_at, payload) values ($1, $2, 'booking', $3, $4, $5)",
-      [b.id, pid, new Date(b.start).toISOString(), new Date(b.end).toISOString(), JSON.stringify(b.appt)]);
+    if (await overLimit(client, pid, ip, b.appt.email.toLowerCase())) { await client.query('rollback'); return res.status(429).json({ ok: false, error: 'limit' }); }
+    // The private key that lets this client change the booking later. Only its hash is stored.
+    const key = crypto.randomBytes(24).toString('base64url');
+    const summary = { name: b.appt.name.split(/\s+/)[0], email: b.appt.email.toLowerCase(), type: b.ty.id, dur: b.ty.min, fee: b.ty.fee, mode: b.appt.mode };
+    await client.query("insert into public.booking_inbox (id, practitioner_id, kind, starts_at, ends_at, payload, summary, token_hash, ip_hash) values ($1, $2, 'booking', $3, $4, $5, $6, $7, $8)",
+      [b.id, pid, new Date(b.start).toISOString(), new Date(b.end).toISOString(), JSON.stringify(b.appt), JSON.stringify(summary), sha(key), ip]);
     await client.query('commit');
 
     // Emails. A failure here never undoes the booking.
@@ -92,12 +86,13 @@ module.exports = async (req, res) => {
       const therapistAddr = t.rows.length ? t.rows[0].email : '';
       const s = data.settings || {}, prof = data.profile || {};
       const info = { clientName: b.appt.name, therapistName: prof.name || 'your therapist', typeName: b.ty.name, min: b.ty.min, start: b.start, tzOff: data.tzOff, mode: b.appt.mode,
-        where: String(prof.where || '').replace(/^Online, and in person in /, ''), room: s.room, fee: b.ty.fee, cancelWindow: s.cancelWindow, latePct: s.latePct };
+        where: String(prof.where || '').replace(/^Online, and in person in /, ''), room: s.room, fee: b.ty.fee, cancelWindow: s.cancelWindow, latePct: s.latePct,
+        manageUrl: siteUrl() ? `${siteUrl()}/?t=${slug}&b=${b.id}&k=${key}` : '' };
       mail = await sendMail(Object.assign({ to: b.appt.email, replyTo: therapistAddr }, confirmationEmail(info)));
       await sendMail(Object.assign({ to: therapistAddr }, therapistEmail(info)));
     } catch (e) { console.error('book mail step failed', e.code || e.name); mail = 'failed'; }
 
-    return res.status(200).json({ ok: true, appt: b.appt, room: (data.settings || {}).room || '', mail });
+    return res.status(200).json({ ok: true, appt: b.appt, room: (data.settings || {}).room || '', mail, manage: { b: b.id, k: key } });
   } catch (e) {
     try { if (client) await client.query('rollback'); } catch (_) {}
     console.error('book failed', e.code || e.name);

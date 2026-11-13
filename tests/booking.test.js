@@ -13,27 +13,20 @@ function practice() {
     hours: { 0: [], 1: [['10:00', '13:00']], 2: [], 3: [], 4: [], 5: [], 6: [] }, blocks: [], intake: [{ id: 'age', label: 'How old are you?' }, { id: 'issue', label: 'Describe your issue', private: true }],
     consent: '', settings: { cancelWindow: 24, latePct: 50, room: 'meet.example/room' }, busy: [], tzOff: -330 };
 }
-const db = { pub: practice(), inbox: [], fail: false };
-const fakeClient = {
-  async query(sql, params) {
-    if (db.fail) { const e = new Error('down'); e.code = 'ECONNREFUSED'; throw e; }
-    if (/from public\.practice_public where slug/.test(sql)) return { rows: params[0] === 'asha-rao-24ad3b' ? [{ practitioner_id: PID, data: JSON.parse(JSON.stringify(db.pub)) }] : [] };
-    if (/select starts_at, ends_at from public\.booking_inbox/.test(sql)) return { rows: db.inbox.filter((r) => r.kind === 'booking').map((r) => ({ starts_at: r.starts_at, ends_at: r.ends_at })) };
-    if (/select 1 from public\.booking_inbox/.test(sql)) return { rows: db.inbox.filter((r) => r.kind === 'booking' && r.starts_at < params[2] && r.ends_at > params[1]).map(() => ({})) };
-    if (/insert into public\.booking_inbox/.test(sql)) { const wl = /'waitlist'/.test(sql); db.inbox.push(wl ? { id: params[0], kind: 'waitlist', payload: JSON.parse(params[2]) } : { id: params[0], kind: 'booking', starts_at: params[2], ends_at: params[3], payload: JSON.parse(params[4]) }); return { rows: [] }; }
-    if (/from auth\.users/.test(sql)) return { rows: [{ email: 'therapist@example.com' }] };
-    return { rows: [] };
-  },
-  release() {},
-};
-require.cache[path.resolve(__dirname, '../api/_lib/db.js')] = { id: 'db', filename: 'db', loaded: true, exports: { getPool: () => ({ connect: async () => fakeClient, query: (s, p) => fakeClient.query(s, p) }) } };
+const { makeFakeDb } = require('./fake-db');
+const { db, pool } = makeFakeDb('asha-rao-24ad3b', PID);
+db.pub = practice();
+require.cache[path.resolve(__dirname, '../api/_lib/db.js')] = { id: 'db', filename: 'db', loaded: true, exports: { getPool: () => pool } };
 const book = require('../api/book.js');
 const practiceApi = require('../api/practice.js');
-const { confirmationEmail, therapistEmail } = require('../api/_lib/mail.js');
+const manage = require('../api/manage.js');
+const { confirmationEmail, therapistEmail, changeEmail } = require('../api/_lib/mail.js');
 
 function res() { return { statusCode: 200, body: null, headers: {}, setHeader(k, v) { this.headers[k] = v; }, status(c) { this.statusCode = c; return this; }, json(o) { this.body = o; return this; } }; }
 const good = () => ({ t: 'asha-rao-24ad3b', kind: 'booking', fn: 'Ravi', ln: 'Kumar', email: 'ravi@example.com', wa: '98765 43210', type: 'first', start: START, mode: 'Online', answers: { age: '29', issue: 'Sleep', extra: 'ignored' }, agree: true });
-const post = async (body) => { const r = res(); await book({ method: 'POST', body }, r); return r; };
+const post = async (body, ip) => { const r = res(); await book({ method: 'POST', body, headers: { 'x-forwarded-for': ip || '' } }, r); return r; };
+const mg = async (body) => { const r = res(); await manage({ method: 'POST', body, headers: {} }, r); return r; };
+const mgGet = async (query) => { const r = res(); await manage({ method: 'GET', query, headers: {} }, r); return r; };
 
 test('a valid booking is stored and returned', async () => {
   db.inbox = []; delete process.env.RESEND_API_KEY;
@@ -97,6 +90,7 @@ test('the public page hides the video link and includes pending bookings as take
   assert.strictEqual(r.statusCode, 200);
   assert.strictEqual(r.body.data.settings.room, '');
   assert.deepStrictEqual(r.body.data.busy, [[START, START + 60 * 60000]]);
+  assert.ok(!JSON.stringify(r.body).includes('token'), 'no keys on the public page');
   assert.ok(!JSON.stringify(r.body).includes('Ravi'), 'no client names on the public page');
   const nf = res(); await practiceApi({ query: { t: 'nobody-000000' } }, nf); assert.strictEqual(nf.statusCode, 404);
 });
@@ -107,6 +101,7 @@ test('emails are sent through Resend when a key is set, and a mail failure does 
   let r = await post(good());
   assert.strictEqual(r.body.mail, 'sent');
   assert.strictEqual(sent.length, 2);
+  assert.ok(!sent[0].body.html.includes('Reschedule or cancel'), 'no manage link unless the site address is configured');
   assert.deepStrictEqual(sent[0].body.to, ['ravi@example.com']);
   assert.strictEqual(sent[0].body.reply_to, 'therapist@example.com');
   assert.deepStrictEqual(sent[1].body.to, ['therapist@example.com']);
@@ -122,4 +117,92 @@ test('confirmation email template has the session details in India time and esca
   assert.match(m.text, /Monday/); assert.match(m.text, /11:00 am/); assert.match(m.text, /₹1,500/); assert.match(m.text, /https:\/\/meet\.example\/room/);
   assert.ok(!m.html.includes('<b>Ravi</b>'));
   assert.match(therapistEmail({ clientName: 'Ravi Kumar', typeName: 'First session', min: 60, start: START, tzOff: -330 }).subject, /Ravi Kumar/);
+});
+
+// ---- spam protection ----
+test('a filled hidden field is accepted silently and nothing is stored', async () => {
+  db.inbox = [];
+  const r = await post(Object.assign(good(), { hp: 'http://spam.example' }));
+  assert.strictEqual(r.statusCode, 200); assert.strictEqual(r.body.appt, undefined); assert.strictEqual(db.inbox.length, 0);
+});
+test('one visitor is limited to a few requests an hour, others are not affected', async () => {
+  db.inbox = []; db.pub.hours[1] = [['07:00', '22:00']];
+  const codes = [];
+  for (let i = 0; i < 8; i++) codes.push((await post(Object.assign(good(), { start: START - 4 * 36e5 + i * 36e5, email: `p${i}@example.com` }), '203.0.113.9')).statusCode);
+  assert.deepStrictEqual(codes, [200, 200, 200, 200, 200, 200, 429, 429]);
+  assert.strictEqual((await post(Object.assign(good(), { start: START + 8 * 36e5, email: 'other@example.com' }), '198.51.100.7')).statusCode, 200);
+  assert.ok(db.inbox.every((r) => !/203\.0\.113/.test(r.ip_hash || '')), 'address is stored only as a hash');
+  db.pub.hours[1] = [['10:00', '13:00']];
+});
+test('the same email cannot hold more than three new bookings a day', async () => {
+  db.inbox = []; db.pub.hours[1] = [['07:00', '22:00']];
+  const codes = [];
+  for (let i = 0; i < 4; i++) codes.push((await post(Object.assign(good(), { start: START - 4 * 36e5 + i * 36e5 }), '192.0.2.' + i)).statusCode);
+  assert.deepStrictEqual(codes, [200, 200, 200, 429]);
+  db.pub.hours[1] = [['10:00', '13:00']];
+});
+test('a therapist-wide hourly cap stops a flood from many addresses', async () => {
+  db.inbox = []; db.limit = { hour_all: 40, hour_ip: 0, day_email: 0 };
+  assert.strictEqual((await post(good())).statusCode, 429);
+  db.limit = null;
+});
+
+// ---- client changes ----
+async function freshBooking() { db.inbox = []; db.pub = practice(); const r = await post(good()); return { b: r.body.manage.b, k: r.body.manage.k, t: 'asha-rao-24ad3b' }; }
+test('the private link shows the booking; a wrong key or id shows nothing', async () => {
+  const m = await freshBooking();
+  const r = await mgGet(m);
+  assert.strictEqual(r.statusCode, 200);
+  assert.strictEqual(r.body.booking.start, START); assert.strictEqual(r.body.booking.name, 'Ravi'); assert.strictEqual(r.body.booking.status, 'upcoming');
+  assert.ok(!JSON.stringify(r.body).includes('Sleep'), 'intake answers are never returned');
+  assert.strictEqual((await mgGet(Object.assign({}, m, { k: 'wrong-key' }))).statusCode, 404);
+  assert.strictEqual((await mgGet(Object.assign({}, m, { b: '00000000-0000-4000-8000-000000000000' }))).statusCode, 404);
+  assert.strictEqual((await mg(Object.assign({}, m, { k: 'wrong-key', action: 'cancel' }))).statusCode, 404);
+  assert.ok(db.inbox[0].token_hash && db.inbox[0].token_hash !== m.k, 'only a hash of the key is stored');
+});
+test('cancelling early is free, frees the slot and leaves a change for the console', async () => {
+  const m = await freshBooking();
+  const r = await mg(Object.assign({}, m, { action: 'cancel', reason: 'Unwell' }));
+  assert.strictEqual(r.statusCode, 200);
+  assert.strictEqual(r.body.booking.status, 'cancelled'); assert.strictEqual(r.body.booking.lateFee, 0);
+  const ch = db.inbox.find((x) => x.kind === 'cancel');
+  assert.strictEqual(ch.payload.apptId, 'b' + m.b); assert.strictEqual(ch.payload.reason, 'Unwell');
+  assert.strictEqual((await mg(Object.assign({}, m, { action: 'cancel' }))).statusCode, 409, 'cannot cancel twice');
+  assert.strictEqual((await post(Object.assign(good(), { email: 'next@example.com' }))).statusCode, 200, 'the slot can be booked again');
+});
+test('cancelling inside the window applies the late fee from the therapist’s policy', async () => {
+  const m = await freshBooking();
+  db.inbox[0].starts_at = new Date(Date.now() + 2 * 36e5).toISOString();
+  const r = await mg(Object.assign({}, m, { action: 'cancel' }));
+  assert.strictEqual(r.body.booking.late, true); assert.strictEqual(r.body.booking.lateFee, 750);
+});
+test('moving to a free time works; taken, closed and late moves are refused', async () => {
+  const m = await freshBooking();
+  db.pub.busy = [[START + 60 * 60000, START + 120 * 60000]];
+  assert.strictEqual((await mg(Object.assign({}, m, { action: 'reschedule', start: START + 60 * 60000 }))).body.error, 'slot');
+  assert.strictEqual((await mg(Object.assign({}, m, { action: 'reschedule', start: START + 6 * 36e5 }))).body.error, 'slot');
+  db.pub.busy = [];
+  const r = await mg(Object.assign({}, m, { action: 'reschedule', start: START + 30 * 60000 }));
+  assert.strictEqual(r.statusCode, 200, 'may overlap their own old time');
+  assert.strictEqual(r.body.booking.start, START + 30 * 60000);
+  const ch = db.inbox.find((x) => x.kind === 'reschedule');
+  assert.strictEqual(ch.payload.start, START + 30 * 60000);
+  assert.strictEqual((await post(Object.assign(good(), { email: 'next@example.com', start: START + 60 * 60000 }))).statusCode, 409, 'the new time is held');
+  db.inbox[0].starts_at = new Date(Date.now() + 2 * 36e5).toISOString();
+  assert.strictEqual((await mg(Object.assign({}, m, { action: 'reschedule', start: START + 60 * 60000 }))).body.error, 'late');
+});
+test('change emails say what happened and carry no intake answers', () => {
+  const c = changeEmail({ kind: 'cancelled', clientName: 'Ravi', therapistName: 'Asha Rao', typeName: 'First session', min: 60, start: START, tzOff: -330, lateFee: 750 });
+  assert.match(c.subject, /cancelled/); assert.match(c.text, /₹750/);
+  const mv = changeEmail({ kind: 'moved', forTherapist: true, clientName: 'Ravi', therapistName: 'Asha Rao', typeName: 'First session', min: 60, start: START + 36e5, oldStart: START, tzOff: -330 });
+  assert.match(mv.subject, /Ravi moved/); assert.match(mv.text, /12:00 pm/); assert.match(mv.text, /11:00 am/);
+});
+test('the manage link goes in the confirmation email only from the configured site address', async () => {
+  db.inbox = []; db.pub = practice(); process.env.RESEND_API_KEY = 'k'; process.env.SITE_URL = 'https://book.example';
+  const sent = []; const realFetch = global.fetch; global.fetch = async (u, o) => { sent.push(JSON.parse(o.body)); return { ok: true, status: 200 }; };
+  const r = await book({ method: 'POST', body: good(), headers: { host: 'evil.example', 'x-forwarded-host': 'evil.example' } }, res());
+  global.fetch = realFetch; delete process.env.RESEND_API_KEY; delete process.env.SITE_URL;
+  assert.match(sent[0].html, /https:\/\/book\.example\/\?t=asha-rao-24ad3b&amp;b=/);
+  assert.ok(!sent[0].html.includes('evil.example'));
+  assert.ok(!sent[1].html.includes('&amp;k='), 'the therapist’s copy has no client key');
 });

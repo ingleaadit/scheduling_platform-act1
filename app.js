@@ -98,7 +98,7 @@ const fakeUtr=n=>'6'+String((n*7919+31337)*104729%1e11).padStart(11,'0');
 const payLink=a=>'practice.example/pay/'+a.id;
 const checkLink=a=>'practice.example/c/'+a.id;
 function payText(a){const amt=due(a)||a.fee;return `Hi ${firstName(a.name)}, ${a.status==='held'?'thank you for the session on '+fD(a.start)+'. The fee is '+money(amt):'the late cancellation fee for '+fD(a.start)+' is '+money(amt)}. You can pay by UPI here: https://${payLink(a)}\nOr pay to UPI ID ${D().settings.upi}.`}
-function newClient(){return {step:'intro',mode:'Online',type:'first',day:null,slot:null,d:{fn:'',ln:'',email:'',wa:''},a:{},g:{name:'',rel:'',wa:''},agree:false,err:{},booked:null,resched:null,cancelAsk:false,cancelReason:'',wl:{fn:'',ln:'',wa:'',days:'Weekdays',times:'Evenings after 6',type:'first'},wlDone:false}}
+function newClient(){return {step:'intro',mode:'Online',type:'first',day:null,slot:null,d:{fn:'',ln:'',email:'',wa:'',hp:''},a:{},g:{name:'',rel:'',wa:''},agree:false,err:{},booked:null,resched:null,cancelAsk:false,cancelReason:'',wl:{fn:'',ln:'',wa:'',days:'Weekdays',times:'Evenings after 6',type:'first'},wlDone:false}}
 function fresh(){return {view:'client',device:'desktop',c:newClient(),t:{tab:'schedule',apFilter:'upcoming',hide:false,freed:null,period:90,blk:{date:'',from:'17:00',to:'18:00',note:''},sv:{date:'',hours:'1',sup:'',kind:'Individual',note:''},svc:{},wadd:{name:'',wa:'',pref:''}},modal:null,data:ensure(seed()),auth:false,login:newLogin()}}
 function newLogin(){return {mode:'email',email:'',pw:'',pw2:'',phone:'',otp:'',sent:false,err:'',note:'',busy:false}}
 const DEMO_EMAIL='demo@practice.test',DEMO_PW='Practice2026',DEMO_OTP='123456';
@@ -131,10 +131,17 @@ function pubLoad(){S.pubErr='';
   return fetch('/api/practice?t='+encodeURIComponent(SLUG)).then(r=>r.ok?r.json():Promise.reject(r.status)).then(j=>{const d=blankData(),p=j.data||{};
     ['profile','types','hours','blocks','intake','consent'].forEach(k=>{if(p[k]!=null)d[k]=p[k]});Object.assign(d.settings,p.settings||{});
     d.appts=(p.busy||[]).map(([f,t],i)=>({id:'x'+i,name:'',type:d.types[0].id,start:f,dur:Math.round((t-f)/6e4),fee:0,status:'upcoming'}));
-    S.data=ensure(d);S.pubReady=true})
+    (S.mine||[]).forEach(a=>d.appts.push(a));S.data=ensure(d);
+    /* A private link from the confirmation email (?b=…&k=…) opens that booking so the client can move or cancel it. */
+    const q=new URLSearchParams(location.search),mb=q.get('b'),mk=q.get('k');
+    if(mb&&mk&&!S.mgTried){S.mgTried=true;return fetch('/api/manage?t='+encodeURIComponent(SLUG)+'&b='+encodeURIComponent(mb)+'&k='+encodeURIComponent(mk)).then(r=>r.json().catch(()=>({}))).then(j=>{
+      if(j&&j.ok&&j.booking){const a=Object.assign({paid:false,waived:false},j.booking);S.mine=[a];S.mg={[a.id]:mk};S.data.appts.push(a);S.c.booked=a.id;S.c.type=a.type;S.c.step='booked'}
+      else toast('That link no longer works. You can still book a new time.');S.pubReady=true},()=>{S.pubReady=true})}
+    S.pubReady=true})
   .catch(st=>{S.pubErr=st===404?'This booking link is not active. Check the link with your therapist.':'We could not load this page. Check your connection, then try again.'})
   .then(()=>render())}
 function pubLoadingView(){return `<div class="scr"><div style="padding:48px 28px;display:flex;flex-direction:column;gap:14px;align-items:flex-start"><p class="muted" style="margin:0">${S.pubErr?esc(S.pubErr):'Loading…'}</p>${S.pubErr&&!/not active/.test(S.pubErr)?'<button type="button" class="btn2" data-a="pubretry">Try again</button>':''}</div></div>`}
+function pubManage(a,body){return fetch('/api/manage',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(Object.assign({t:SLUG,b:a.id.slice(1),k:(S.mg||{})[a.id]},body))}).then(r=>r.json().catch(()=>({})).then(j=>({st:r.status,j})))}
 function pubPost(body){return fetch('/api/book',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(Object.assign({t:SLUG},body))}).then(r=>r.json().catch(()=>({})).then(j=>({st:r.status,j})))}
 try{if(LIVE==='therapist'&&window.supabase&&window.SUPABASE_URL&&window.SUPABASE_PUBLISHABLE_KEY)SB=window.supabase.createClient(window.SUPABASE_URL,window.SUPABASE_PUBLISHABLE_KEY)}catch(e){SB=null}
 function sbLogin(L){
@@ -195,10 +202,14 @@ function sbFlush(){clearTimeout(sbT);
 function sbInbox(){if(!SB||!S.auth||!S.dbReady||document.hidden)return Promise.resolve();
   return SB.from('booking_inbox').select('id,kind,payload').is('imported_at',null).order('created_at').then(({data,error})=>{if(error||!data||!data.length)return;
     let n=0;S.inbox=S.inbox||[];
-    data.forEach(r=>{const p=r.payload||{};if(!p.id)return;const list=r.kind==='waitlist'?S.data.waitlist:S.data.appts;
-      if(!list.some(x=>x.id===p.id)){list.push(p);n++}if(!S.inbox.includes(r.id))S.inbox.push(r.id)});
+    data.forEach(r=>{const p=r.payload||{};if(!p.id)return;
+      if(r.kind==='cancel'||r.kind==='reschedule'){const x=S.data.appts.find(a=>a.id===p.apptId);
+        /* A change the client made from their private link. Only a session that is still upcoming can be changed. */
+        if(x&&x.status==='upcoming'){if(r.kind==='cancel'){cancelAppt(x,p.reason||'Other',p.at);x.cancelledBy='client';n++}else if(x.start!==p.start){x.start=p.start;x.reminded=false;x.movedAt=p.at;x.isNew=true;n++}}}
+      else{const list=r.kind==='waitlist'?S.data.waitlist:S.data.appts;if(!list.some(x=>x.id===p.id)){list.push(p);n++}}
+      if(!S.inbox.includes(r.id))S.inbox.push(r.id)});
     sbQueue();
-    if(n){toast(n===1?'New request from your booking page':n+' new requests from your booking page');const tg=(document.activeElement||{}).tagName||'';if(!S.modal&&!/INPUT|TEXTAREA|SELECT/.test(tg))render()}},()=>{})}
+    if(n){toast(n===1?'New update from your booking page':n+' new updates from your booking page');const tg=(document.activeElement||{}).tagName||'';if(!S.modal&&!/INPUT|TEXTAREA|SELECT/.test(tg))render()}},()=>{})}
 function sbLoadingView(){return `<div class="scr"><div style="padding:48px 28px;display:flex;flex-direction:column;gap:14px;align-items:flex-start"><p class="muted" style="margin:0">${S.dbErr?esc(S.dbErr):'Loading your practice…'}</p>${S.dbErr?'<button type="button" class="btn2" data-a="sbretry">Try again</button> <button type="button" class="linkbtn" data-a="logout" style="padding:0">Log out</button>':''}</div></div>`}
 let S=fresh();
 try{S.auth=localStorage.getItem(KEY+'-auth')==='1'}catch(e){}
@@ -321,7 +332,7 @@ function vTime(){const c=S.c,ty=typeOf(c.type),ds=days();
   <p class="muted" style="margin:0;font-size:13px">Times shown in India Standard Time.</p></div>
   ${c.resched||!paid()?'':`<div class="note soft" style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap"><span><b>None of these work?</b><br><span class="muted">Join the waitlist and get a WhatsApp message when a time you want opens up.</span></span><button class="mini w" data-a="go" data-v="waitlist">Join the waitlist</button></div>`}`}
 
-function vDetails(){const e=S.c.err;return `<div class="grid2">${field('fn','First name','c.d.fn',{err:e.fn,ac:'given-name'})}${field('ln','Last name','c.d.ln',{err:e.ln,ac:'family-name'})}</div>
+function vDetails(){const e=S.c.err;return `${SLUG?'<div aria-hidden="true" style="position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden"><label>Website<input type="text" tabindex="-1" autocomplete="off" data-f="c.d.hp" value=""></label></div>':''}<div class="grid2">${field('fn','First name','c.d.fn',{err:e.fn,ac:'given-name'})}${field('ln','Last name','c.d.ln',{err:e.ln,ac:'family-name'})}</div>
   ${field('em','Email','c.d.email',{type:'email',err:e.email,ph:'name@example.com',ac:'email',hint:'For your booking details. Nothing else.'})}
   ${field('wa','WhatsApp number','c.d.wa',{type:'tel',mode:'numeric',err:e.wa,pre:'+91',ph:'98765 43210',ac:'tel-national',hint:'Reminders come here, worded so nobody else can tell what they are for.'})}`}
 
@@ -345,11 +356,11 @@ function vBooked(){const a=D().appts.find(x=>x.id===S.c.booked);if(!a)return '<p
   const lateNow=a.start-Date.now()<s.cancelWindow*36e5;
   if(a.status==='cancelled')return `<div class="sec" style="max-width:640px"><h1 style="font-size:34px">Session cancelled</h1><p class="muted" style="margin:0;font-size:17px;line-height:1.5">${esc(fDL(a.start))}, ${fT(a.start)} is cancelled. ${a.lateFee?`A late cancellation fee of ${money(a.lateFee)} applies, as in the policy.`:'No fee applies.'}</p><div><button class="btn" data-a="startBook">Book another time</button></div></div>`;
   return `<div class="sec" style="max-width:680px;gap:18px"><span class="av" style="width:56px;height:56px;font-size:26px">✓</span><h1 style="font-size:${S.device==='phone'?'32px':'40px'}">You’re booked, ${esc(firstName(a.name))}</h1>
-  <p class="muted" style="margin:0;font-size:17px;line-height:1.5">${SLUG?(a.mail==='sent'?`A confirmation email is on its way to ${esc(a.email)}.`:`${esc(firstName(P().name))} has your booking and will be in touch to confirm.`):`${esc(firstName(P().name))} will confirm on WhatsApp and send a reminder the day before.`}${a.guardian?' She will also contact your parent or guardian for consent.':''}</p>
-  <div class="card"><dl class="kv"><dt>Session</dt><dd>${esc(ty.name)}, ${ty.min} min</dd><dt>When</dt><dd>${esc(fDL(a.start))}, ${fT(a.start)}</dd><dt>Where</dt><dd>${videoFor(a)?`Online. Video link: <a href="https://${videoFor(a)}" target="_blank" rel="noopener">${esc(videoFor(a))}</a>`:SLUG&&a.mode!=='In person'?`Online. ${esc(firstName(P().name))} will send the video link before the session.`:esc(P().where.replace(/^Online, and in person in /,''))}</dd><dt>Fee</dt><dd>${money(a.fee)}, by UPI after the session.${SLUG?'':' A payment link comes on WhatsApp.'}</dd><dt>WhatsApp</dt><dd>${esc(a.wa)}</dd></dl></div>
-  ${SLUG?`<p class="muted" style="margin:0;font-size:14px">To change or cancel, ${a.mail==='sent'?'reply to the confirmation email':'contact '+esc(firstName(P().name))}. It is free until ${esc(fD(a.start-s.cancelWindow*36e5))}, ${fT(a.start-s.cancelWindow*36e5)}.</p>`:c.cancelAsk?`<div class="panel sec"><b>Cancel this session?</b>${lateNow?`<div class="note warn">It starts in less than ${s.cancelWindow} hours, so a fee of ${money(Math.round(a.fee*s.latePct/100))} applies.</div>`:'<span class="muted">No fee applies.</span>'}
+  <p class="muted" style="margin:0;font-size:17px;line-height:1.5">${SLUG?(a.mail==='sent'?`A confirmation email is on its way to ${esc(a.email)}. It has a private link to move or cancel this session.`:`${esc(firstName(P().name))} has your booking and will be in touch to confirm.`):`${esc(firstName(P().name))} will confirm on WhatsApp and send a reminder the day before.`}${a.guardian?' She will also contact your parent or guardian for consent.':''}</p>
+  <div class="card"><dl class="kv"><dt>Session</dt><dd>${esc(ty.name)}, ${ty.min} min</dd><dt>When</dt><dd>${esc(fDL(a.start))}, ${fT(a.start)}</dd><dt>Where</dt><dd>${videoFor(a)?`Online. Video link: <a href="https://${videoFor(a)}" target="_blank" rel="noopener">${esc(videoFor(a))}</a>`:SLUG&&a.mode!=='In person'?`Online. ${esc(firstName(P().name))} will send the video link before the session.`:esc(P().where.replace(/^Online, and in person in /,''))}</dd><dt>Fee</dt><dd>${money(a.fee)}, by UPI after the session.${SLUG?'':' A payment link comes on WhatsApp.'}</dd>${a.wa?`<dt>WhatsApp</dt><dd>${esc(a.wa)}</dd>`:''}</dl></div>
+  ${SLUG&&!(S.mg||{})[a.id]?`<p class="muted" style="margin:0;font-size:14px">To change or cancel, ${a.mail==='sent'?'reply to the confirmation email':'contact '+esc(firstName(P().name))}. It is free until ${esc(fD(a.start-s.cancelWindow*36e5))}, ${fT(a.start-s.cancelWindow*36e5)}.</p>`:c.cancelAsk?`<div class="panel sec"><b>Cancel this session?</b>${lateNow?`<div class="note warn">It starts in less than ${s.cancelWindow} hours, so a fee of ${money(Math.round(a.fee*s.latePct/100))} applies.</div>`:'<span class="muted">No fee applies.</span>'}
     ${chips('c.cancelReason',REASONS,'Reason, optional')}<div style="display:flex;gap:10px;flex-wrap:wrap"><button class="btn" data-a="clientCancel">Cancel session</button><button class="btn2" data-a="set" data-k="c.cancelAsk" data-v="">Keep it</button></div></div>`
-  :`<div style="display:flex;gap:10px;flex-wrap:wrap"><button class="btn2" data-a="resched">Reschedule</button><button class="btn2" data-a="set" data-k="c.cancelAsk" data-v="1">Cancel</button></div>
+  :`<div style="display:flex;gap:10px;flex-wrap:wrap">${SLUG&&lateNow?'':'<button class="btn2" data-a="resched">Reschedule</button>'}<button class="btn2" data-a="set" data-k="c.cancelAsk" data-v="1">Cancel</button></div>
     <p class="muted" style="margin:0;font-size:13px">Free to cancel or move until ${esc(fD(a.start-s.cancelWindow*36e5))}, ${fT(a.start-s.cancelWindow*36e5)}.</p>`}
   ${LIVE?'':'<p class="muted" style="margin:0;font-size:13px">Switch to the Therapist window to see this booking arrive.</p>'}</div>`}
 
@@ -802,16 +813,25 @@ function act(a,el){const ds=el.dataset,c=S.c,d=D();if(a!=='calMenu')S.t.calMenu=
   case 'pickType':c.type=ds.v;c.slot=null;c.day=null;break;
   case 'pickDay':c.day=Number(ds.v);c.slot=null;break;
   case 'pickSlot':c.slot=Number(ds.v);break;
-  case 'toDetails':if(!c.slot)return;if(c.resched){const b=d.appts.find(x=>x.id===c.resched);b.start=c.slot;b.reminded=false;c.booked=b.id;c.resched=null;go('booked');toast('Session moved to '+fD(b.start)+', '+fT(b.start));save();break}go('details');break;
+  case 'toDetails':if(!c.slot)return;
+    if(c.resched&&SLUG){if(c.sending)return;const b=d.appts.find(x=>x.id===c.resched),slot=c.slot;c.sending=true;toast('Moving your session…');
+      pubManage(b,{action:'reschedule',start:slot}).then(({st,j})=>{c.sending=false;
+        if(j&&j.ok){b.start=slot;b.mail=j.mail;c.booked=b.id;c.resched=null;go('booked');toast('Session moved to '+fD(b.start)+', '+fT(b.start));render()}
+        else if(st===409&&j.error==='slot'){toast('That time was just taken. Pick another.');c.slot=null;pubLoad()}
+        else{toast(st===409?'This session can no longer be moved online. Contact '+firstName(P().name)+'.':st===429?'Too many requests just now. Try again in an hour.':'We could not move it. Try again.');c.resched=null;go('booked');render()}})
+      .catch(()=>{c.sending=false;toast('We could not reach the server. Check your connection and try again.');render()});
+      return}
+    if(c.resched){const b=d.appts.find(x=>x.id===c.resched);b.start=c.slot;b.reminded=false;c.booked=b.id;c.resched=null;go('booked');toast('Session moved to '+fD(b.start)+', '+fT(b.start));save();break}go('details');break;
   case 'toAbout':{const e=valDetails();if(Object.keys(e).length){c.err=e;render();focusErr();return}go('about');break}
   case 'toConfirm':{const e=valAbout();if(Object.keys(e).length){c.err=e;render();focusErr();return}go('confirm');break}
   case 'book':{if(!c.agree){c.err={agree:'Tick the box to agree before confirming'};render();focusErr();return}const ty=typeOf(c.type);
     if(d.appts.some(x=>x.status==='upcoming'&&x.start===c.slot)){toast('That time was just taken. Pick another.');go('time');c.slot=null;break}
     if(SLUG){if(c.sending)return;c.sending=true;toast('Booking your session…');
-      pubPost({kind:'booking',fn:c.d.fn,ln:c.d.ln,email:c.d.email,wa:c.d.wa,type:ty.id,start:c.slot,mode:c.mode||'Online',answers:c.a,guardian:minor()?c.g:null,agree:true})
+      pubPost({kind:'booking',fn:c.d.fn,ln:c.d.ln,email:c.d.email,wa:c.d.wa,type:ty.id,start:c.slot,mode:c.mode||'Online',answers:c.a,guardian:minor()?c.g:null,agree:true,hp:c.d.hp})
       .then(({st,j})=>{c.sending=false;
-        if(j&&j.ok&&j.appt){if(j.room)D().settings.room=j.room;j.appt.mail=j.mail;D().appts.push(j.appt);c.booked=j.appt.id;go('booked');toast('Booked');render()}
+        if(j&&j.ok&&j.appt){if(j.room)D().settings.room=j.room;j.appt.mail=j.mail;D().appts.push(j.appt);(S.mine=S.mine||[]).push(j.appt);if(j.manage)(S.mg=S.mg||{})[j.appt.id]=j.manage.k;c.booked=j.appt.id;go('booked');toast('Booked');render()}
         else if(st===409){toast('That time was just taken. Pick another.');c.slot=null;go('time');pubLoad()}
+        else if(st===429){toast('Too many requests just now. Try again in an hour, or contact '+firstName(P().name)+'.');render()}
         else{toast('We could not book that. Check your details and try again.');render()}})
       .catch(()=>{c.sending=false;toast('We could not reach the server. Check your connection and try again.');render()});
       return}
@@ -819,7 +839,13 @@ function act(a,el){const ds=el.dataset,c=S.c,d=D();if(a!=='calMenu')S.t.calMenu=
       intake:d.intake.map(q=>({label:q.label,answer:String(c.a[q.id]==null?'':c.a[q.id]),private:!!q.private})).filter(q=>q.answer),guardian:minor()?Object.assign({},c.g):null,consentAt:Date.now(),bookedAt:Date.now(),mode:c.mode||'Online',source:'Client page',reminded:false,isNew:true};
     d.appts.push(b);c.booked=b.id;go('booked');save();break}
   case 'resched':{c.resched=c.booked;const rb=d.appts.find(x=>x.id===c.booked);c.type=rb.type;c.slot=null;c.day=null;c.cancelAsk=false;go('time');break}
-  case 'clientCancel':{const b=d.appts.find(x=>x.id===c.booked);cancelAppt(b,c.cancelReason||'Other');c.cancelAsk=false;save();break}
+  case 'clientCancel':{const b=d.appts.find(x=>x.id===c.booked);
+    if(SLUG){if(c.sending)return;c.sending=true;
+      pubManage(b,{action:'cancel',reason:c.cancelReason||'Other'}).then(({st,j})=>{c.sending=false;
+        if(j&&j.ok&&j.booking){Object.assign(b,{status:'cancelled',late:j.booking.late,lateFee:j.booking.lateFee,reason:j.booking.reason});c.cancelAsk=false}
+        else toast(st===429?'Too many requests just now. Try again in an hour.':'We could not cancel it. Try again, or contact '+firstName(P().name)+'.');render()})
+      .catch(()=>{c.sending=false;toast('We could not reach the server. Check your connection and try again.');render()});
+      return}cancelAppt(b,c.cancelReason||'Other');c.cancelAsk=false;save();break}
   case 'joinWl':{const w=c.wl,e={};if(!w.fn.trim())e.fn='Enter your first name';if(!w.ln.trim())e.ln='Enter your last name';if(w.wa.replace(/\D/g,'').length!==10)e.wa='Enter a 10-digit number';if(Object.keys(e).length){c.err=e;render();focusErr();return}
     if(SLUG){if(c.sending)return;c.sending=true;c.err={};
       pubPost({kind:'waitlist',fn:w.fn,ln:w.ln,wa:w.wa,days:w.days,times:w.times,type:w.type})
@@ -939,7 +965,7 @@ function act(a,el){const ds=el.dataset,c=S.c,d=D();if(a!=='calMenu')S.t.calMenu=
   default:return}
   render()}
 function selectEl(el){if(el.select){el.focus();el.select();return}const r=document.createRange();r.selectNodeContents(el);const s=window.getSelection();s.removeAllRanges();s.addRange(r)}
-function cancelAppt(x,reason){const s=D().settings;const late=x.start-Date.now()<s.cancelWindow*36e5;x.status='cancelled';x.reason=reason;x.late=late;x.lateFee=late?Math.round(x.fee*s.latePct/100):0;x.paid=false;x.isNew=false;x.cancelledAt=Date.now();if(x.start>Date.now())S.t.freed={start:x.start,dur:x.dur,by:x.name,late}}
+function cancelAppt(x,reason,when){const s=D().settings;const late=x.start-(when||Date.now())<s.cancelWindow*36e5;x.status='cancelled';x.reason=reason;x.late=late;x.lateFee=late?Math.round(x.fee*s.latePct/100):0;x.paid=false;x.isNew=false;x.cancelledAt=when||Date.now();if(x.start>Date.now())S.t.freed={start:x.start,dur:x.dur,by:x.name,late}}
 function focusErr(){const el=document.querySelector('#stage .f.bad .in, #stage .f.bad .chip, #stage .err');if(el){el.scrollIntoView({block:'center'});if(el.focus)el.focus()}}
 
 document.addEventListener('click',e=>{const ov=e.target.closest('[data-a="closeOv"]');const inSheet=e.target.closest('[data-stop]');const el=e.target.closest('[data-a]');

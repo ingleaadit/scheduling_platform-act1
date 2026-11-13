@@ -13,7 +13,7 @@ module.exports = async (req, res) => {
     if (data.settings) data.settings = Object.assign({}, data.settings, { room: '' });
     // Times held by bookings the therapist's console has not picked up yet.
     const p = await getPool().query(
-      "select starts_at, ends_at from public.booking_inbox b join public.practice_public p on p.practitioner_id = b.practitioner_id where p.slug = $1 and b.kind = 'booking' and b.imported_at is null and b.ends_at > now()", [slug]);
+      "select starts_at, ends_at from public.booking_inbox b join public.practice_public p on p.practitioner_id = b.practitioner_id where p.slug = $1 and b.kind in ('booking', 'reschedule') and b.imported_at is null and b.cancelled_at is null and b.ends_at > now()", [slug]);
     data.busy = (data.busy || []).concat(p.rows.map((x) => [new Date(x.starts_at).getTime(), new Date(x.ends_at).getTime()]));
     return res.status(200).json({ ok: true, data });
   } catch (e) {

@@ -40,10 +40,11 @@ function confirmationEmail(b) {
     `<p style="margin:0 0 8px;font-size:15px;line-height:1.55">This confirms your session with ${esc(b.therapistName)}.</p>` +
     rows([['Session', esc(`${b.typeName}, ${b.min} min`)], ['When', esc(when)], ['Where', whereHtml], ['Fee', esc(money(b.fee))]]) +
     (policy ? `<p style="margin:0 0 12px;font-size:14px;line-height:1.55;color:#5E5850">${esc(policy)}</p>` : '') +
-    `<p style="margin:0 0 12px;font-size:14px;line-height:1.55;color:#5E5850">To change or cancel, reply to this email.</p>` +
+    (b.manageUrl ? `<p style="margin:0 0 16px"><a href="${esc(b.manageUrl)}" style="display:inline-block;background:#0A0908;color:#FFFFFF;text-decoration:none;font-size:15px;padding:11px 18px;border-radius:8px">Reschedule or cancel</a></p><p style="margin:0 0 12px;font-size:13px;line-height:1.55;color:#5E5850">This link is private to you. Anyone who has it can change this booking, so don’t forward this email.</p>`
+      : `<p style="margin:0 0 12px;font-size:14px;line-height:1.55;color:#5E5850">To change or cancel, reply to this email.</p>`) +
     `<p style="margin:0;font-size:13px;line-height:1.55;color:#5E5850">In crisis or thinking of harming yourself? Call Tele-MANAS on 14416, free and open all day, every day.</p>`);
   const text = [`You're booked, ${firstName(b.clientName)}.`, '', `This confirms your session with ${b.therapistName}.`, '',
-    `Session: ${b.typeName}, ${b.min} min`, `When: ${when}`, `Where: ${whereText}`, `Fee: ${money(b.fee)}`, '', policy, 'To change or cancel, reply to this email.', '',
+    `Session: ${b.typeName}, ${b.min} min`, `When: ${when}`, `Where: ${whereText}`, `Fee: ${money(b.fee)}`, '', policy, b.manageUrl ? 'Reschedule or cancel (private link, do not forward): ' + b.manageUrl : 'To change or cancel, reply to this email.', '',
     'In crisis or thinking of harming yourself? Call Tele-MANAS on 14416, free and open all day, every day.'].filter((l) => l !== null).join('\n');
   return { subject, html, text };
 }
@@ -57,6 +58,26 @@ function therapistEmail(b) {
     rows([['Session', esc(`${b.typeName}, ${b.min} min`)], ['When', esc(when)], ['Mode', esc(b.mode || 'Online')]]) +
     `<p style="margin:0;font-size:14px;line-height:1.55;color:#5E5850">Open your console to see their details and intake answers.</p>`);
   const text = [`${b.clientName} booked a session from your booking page.`, '', `Session: ${b.typeName}, ${b.min} min`, `When: ${when}`, `Mode: ${b.mode || 'Online'}`, '', 'Open your console to see their details and intake answers.'].join('\n');
+  return { subject, html, text };
+}
+
+// Sent to the client and the therapist when the client cancels or moves a session.
+// c: { kind: 'cancelled' | 'moved', forTherapist, clientName, therapistName, typeName, min, start, oldStart, tzOff, lateFee, manageUrl }
+function changeEmail(c) {
+  const when = whenText(c.start, c.tzOff);
+  const moved = c.kind === 'moved';
+  const who = c.forTherapist ? c.clientName : 'Your session with ' + c.therapistName;
+  const subject = c.forTherapist ? `${c.clientName} ${moved ? 'moved their session to ' + when : 'cancelled ' + when}` : `${who} ${moved ? 'has moved to ' + when : 'is cancelled'}`;
+  const line = moved
+    ? (c.forTherapist ? `${c.clientName} moved their session.` : 'Your session has been moved.')
+    : (c.forTherapist ? `${c.clientName} cancelled their session.` : 'Your session has been cancelled.');
+  const fee = !moved ? (c.lateFee ? `A late cancellation fee of ${money(c.lateFee)} applies, as in the policy.` : 'No fee applies.') : '';
+  const list = moved ? [['Session', `${c.typeName}, ${c.min} min`], ['New time', when], ['Was', whenText(c.oldStart, c.tzOff)]] : [['Session', `${c.typeName}, ${c.min} min`], ['Was', when]];
+  const html = shell(moved ? 'Session moved' : 'Session cancelled',
+    `<p style="margin:0 0 8px;font-size:15px;line-height:1.55">${esc(line)}</p>` + rows(list.map(([k, v]) => [k, esc(v)])) +
+    (fee ? `<p style="margin:0 0 12px;font-size:14px;line-height:1.55;color:#5E5850">${esc(fee)}</p>` : '') +
+    (moved && !c.forTherapist && c.manageUrl ? `<p style="margin:0"><a href="${esc(c.manageUrl)}" style="color:#0A0908;font-size:14px">Reschedule or cancel</a></p>` : ''));
+  const text = [line, '', ...list.map(([k, v]) => `${k}: ${v}`), '', fee].join('\n');
   return { subject, html, text };
 }
 
@@ -83,4 +104,4 @@ async function sendMail({ to, subject, html, text, replyTo }) {
   }
 }
 
-module.exports = { confirmationEmail, therapistEmail, sendMail, whenText };
+module.exports = { confirmationEmail, therapistEmail, changeEmail, sendMail, whenText };
