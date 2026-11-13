@@ -134,20 +134,43 @@ function sbLogin(L){
     L.err='';L.busy=true;
     SB.auth.updateUser({password:L.pw}).then(({error})=>{L.busy=false;
       if(error){L.err='Could not set the password. The link may have expired. Ask for a new one.'}
-      else{S.auth=true;S.login=newLogin();toast('Password set. You are signed in.')}
+      else{S.auth=true;S.login=newLogin();toast('Password set. You are signed in.');sbLoad()}
       render()});
     return}
   if(!L.email.trim()||!L.pw){L.err='Enter your email and password';return}
   L.err='';L.busy=true;
   SB.auth.signInWithPassword({email:L.email.trim(),password:L.pw}).then(({error})=>{L.busy=false;
     if(error){L.err='That email and password don’t match.'}
-    else{S.auth=true;S.login=newLogin();toast('Signed in')}
+    else{S.auth=true;S.login=newLogin();toast('Signed in');sbLoad()}
     render()});
 }
+/* A real account starts empty and saves to the database, one private row per therapist. */
+function blankData(){const d=seed();
+  d.appts=[];d.waitlist=[];d.supervision=[];d.blocks=[];d.clients=[];d.devices=[];
+  d.profile={name:'Your name',title:'Counselling psychologist',where:'',langs:'',exp:'',approach:'',about:''};
+  d.types=d.types.map(t=>Object.assign({},t,{desc:t.id==='follow'?'For people already seeing you.':t.id==='reduced'?'A few slots each week at a lower fee.':t.desc}));
+  d.settings=Object.assign({},d.settings,{upi:'',room:''});
+  return d}
+let sbT=null;
+function sbLoad(){
+  S.dbReady=false;S.dbErr='';S.uid=null;
+  return SB.auth.getSession().then(({data})=>{
+    const u=data&&data.session&&data.session.user;if(!u)throw new Error('no session');S.uid=u.id;
+    return SB.from('practice_data').select('data').eq('practitioner_id',u.id).maybeSingle()})
+  .then(({data,error})=>{if(error)throw error;
+    S.data=data&&data.data&&data.data.appts?ensure(data.data):ensure(blankData());S.dbReady=true})
+  .catch(()=>{S.dbErr='We could not load your data. Check your connection, then try again.'})
+  .then(()=>render())}
+function sbQueue(){if(!SB||!S.auth||!S.dbReady)return;clearTimeout(sbT);sbT=setTimeout(sbFlush,1200)}
+function sbFlush(){clearTimeout(sbT);
+  if(!SB||!S.auth||!S.dbReady||!S.uid)return Promise.resolve();
+  return SB.from('practice_data').upsert({practitioner_id:S.uid,data:S.data,updated_at:new Date().toISOString()})
+    .then(({error})=>{if(error)toast('Could not save. Check your connection.')},()=>toast('Could not save. Check your connection.'))}
+function sbLoadingView(){return `<div class="scr"><div style="padding:48px 28px;display:flex;flex-direction:column;gap:14px;align-items:flex-start"><p class="muted" style="margin:0">${S.dbErr?esc(S.dbErr):'Loading your practice…'}</p>${S.dbErr?'<button type="button" class="btn2" data-a="sbretry">Try again</button> <button type="button" class="linkbtn" data-a="logout" style="padding:0">Log out</button>':''}</div></div>`}
 let S=fresh();
 try{S.auth=localStorage.getItem(KEY+'-auth')==='1'}catch(e){}
 try{const raw=localStorage.getItem(KEY);if(raw){const p=JSON.parse(raw);if(p&&p.data&&p.data.appts&&p.v===1){S.data=ensure(p.data);if(p.t)Object.assign(S.t,p.t)}}}catch(e){}
-function save(){try{localStorage.setItem(KEY,JSON.stringify({v:1,data:S.data,t:{freed:S.t.freed,hide:S.t.hide}}));localStorage.setItem(KEY+'-auth',S.auth?'1':'0')}catch(e){}}
+function save(){if(SB){sbQueue();return}try{localStorage.setItem(KEY,JSON.stringify({v:1,data:S.data,t:{freed:S.t.freed,hide:S.t.hide}}));localStorage.setItem(KEY+'-auth',S.auth?'1':'0')}catch(e){}}
 function applyPal(){const p=PALS.find(x=>x.id===(S.data.settings.palette||'neem'))||PALS[0];let css='';
   if(p.id!=='neem'){const L=`--accent:${p.l};--accent-hover:color-mix(in srgb,${p.l} 84%,#000);--soft:${p.s||`color-mix(in srgb,${p.l} 14%,#FFFFFF)`};--panel:${p.s?`color-mix(in srgb,${p.s} 32%,#F7F8F8)`:`color-mix(in srgb,${p.l} 6%,#F6F7F7)`};${p.h?`--head:${p.h};`:''}--canvas:color-mix(in srgb,${p.l} 6%,#F1F2F2);--bg:color-mix(in srgb,${p.l} 2%,#FFFFFF);--line:color-mix(in srgb,${p.l} 14%,#D4D7D6);--text2:color-mix(in srgb,${p.l} 22%,#575C5A);`;
     const Dk=`--accent:${p.d};--accent-hover:color-mix(in srgb,${p.d} 84%,#FFF);--soft:color-mix(in srgb,${p.d} 20%,#141716);--panel:color-mix(in srgb,${p.d} 8%,#191C1B);--canvas:color-mix(in srgb,${p.d} 4%,#0C0E0D);--bg:color-mix(in srgb,${p.d} 4%,#121414);--card:color-mix(in srgb,${p.d} 6%,#1E2120);--line:color-mix(in srgb,${p.d} 18%,#323736);--text2:color-mix(in srgb,${p.d} 18%,#A6ABA9);${p.hd?`--head:${p.hd};`:''}`;
@@ -207,7 +230,7 @@ function render(){
   const key=S.view+S.device+(S.view==='client'?S.c.step:(S.auth?S.t.tab+(S.t.person||''):'login'));
   const sc=document.querySelector('#stage .scr');const keep=key===lastKey?(sc?sc.scrollTop:window.scrollY):null;
   const isM=S.device==='phone';
-  const inner=S.view==='client'?(isM?clientPhone():clientDesk()):(SB&&!S.sbReady)?'<div class="scr"><p class="muted" style="padding:40px">Loading…</p></div>':!S.auth?signIn(isM):(isM?therPhone():therDesk());
+  const inner=S.view==='client'?(isM?clientPhone():clientDesk()):(SB&&!S.sbReady)?'<div class="scr"><p class="muted" style="padding:40px">Loading…</p></div>':!S.auth?signIn(isM):(SB&&!S.dbReady)?sbLoadingView():(isM?therPhone():therDesk());
   const modal=S.modal?renderModal():'';
   const stage=document.getElementById('stage');
   rendering=true;try{const fe=document.activeElement;if(fe&&stage.contains(fe)&&fe.blur)fe.blur()}finally{rendering=false}
@@ -736,7 +759,8 @@ function act(a,el){const ds=el.dataset,c=S.c,d=D();if(a!=='calMenu')S.t.calMenu=
   switch(a){
   case 'view':S.view=ds.v;S.modal=null;setHash();break;
   case 'device':S.device=ds.v;S.modal=null;if(ds.v==='desktop'&&S.t.tab==='more')S.t.tab='schedule';setHash();break;
-  case 'reset':S=Object.assign(fresh(),{view:S.view,device:S.device});save();toast('Demo reset to example data');break;
+  case 'sbretry':if(SB)sbLoad();break;
+  case 'reset':if(SB)break;S=Object.assign(fresh(),{view:S.view,device:S.device});save();toast('Demo reset to example data');break;
   case 'set':{let v=ds.v;const cur=getPath(ds.k);if(ds.k==='c.cancelReason'||ds.k==='modal.reason'){if(cur===v)v=''}setPath(ds.k,v==='' && (ds.k==='c.cancelAsk'||ds.k==='modal.cancel'||ds.k==='modal.show')?false:v);if(ds.k.startsWith('c.a.'))delete c.err[ds.k.slice(4)];break}
   case 'go':if(ds.v==='waitlist'){c.wlFrom=c.step;c.wlDone=false}go(ds.v);if(ds.v==='intro'){c.resched=null;c.wlDone=false}break;
   case 'startBook':if(c.step==='booked'&&c.booked){const b=d.appts.find(x=>x.id===c.booked);if(b&&b.status==='cancelled'){S.c=newClient();}}S.c.type=ds.v||S.c.type||'first';S.c.slot=null;S.c.day=null;go('time');break;
@@ -770,7 +794,7 @@ function act(a,el){const ds=el.dataset,c=S.c,d=D();if(a!=='calMenu')S.t.calMenu=
   case 'find':S.modal={kind:'find',q:''};setTimeout(()=>{const i=document.getElementById('findq');if(i)i.focus()},60);break;
   case 'hide':S.t.hide=!S.t.hide;save();break;
   case 'previewClient':if(LIVE){window.open('index.html','_blank','noopener');break}S.view='client';S.c=newClient();setHash();break;
-  case 'logout':if(SB)SB.auth.signOut();S.auth=false;S.login=newLogin();S.modal=null;S.t.tab='schedule';save();toast('Logged out');break;
+  case 'logout':if(SB){sbFlush().then(()=>SB.auth.signOut());S.data=ensure(blankData());S.dbReady=false;S.uid=null}S.auth=false;S.login=newLogin();S.modal=null;S.t.tab='schedule';save();toast('Logged out');break;
   case 'colours':S.modal={kind:'colours'};break;
   case 'pal':d.settings.palette=ds.v;save();break;
   case 'provider':S.login.note=ds.v+' sign-in isn’t connected in this prototype. Use the demo login below.';S.login.err='';break;
@@ -886,14 +910,15 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape'&&S.modal){S.modal=nu
 function setHash(){if(LIVE)return;const h=S.view+'-'+S.device;if(location.hash!=='#'+h){try{history.replaceState(null,'','#'+h)}catch(e){location.hash=h}}}
 function readHash(){if(LIVE){S.view=LIVE;S.device=window.innerWidth<700?'phone':'desktop';return}const m=/^#(client|therapist)-(desktop|phone)$/.exec(location.hash);if(m){S.view=m[1];S.device=m[2]}else{S.device=window.innerWidth<640?'phone':'desktop'}}
 window.addEventListener('hashchange',()=>{readHash();S.modal=null;render()});
-if(LIVE){document.body.classList.add('live');document.getElementById('livebar').hidden=false;if(LIVE==='therapist')document.getElementById('livereset').hidden=false;
+if(LIVE){document.body.classList.add('live');document.getElementById('livebar').hidden=!!SB;if(LIVE==='therapist'&&!SB)document.getElementById('livereset').hidden=false;
   window.addEventListener('resize',()=>{const dv=window.innerWidth<700?'phone':'desktop';if(dv!==S.device){S.device=dv;S.modal=null;render()}});
   window.addEventListener('storage',e=>{if(e.key!==KEY||!e.newValue)return;try{const p=JSON.parse(e.newValue);if(p&&p.data){S.data=p.data;ensure(S.data);const tg=(document.activeElement||{}).tagName||'';if(!S.modal&&!/INPUT|TEXTAREA|SELECT/.test(tg))render()}}catch(_){}})}
 if(SB){S.auth=false;
   SB.auth.getSession().then(({data})=>{S.sbReady=true;S.auth=!!(data&&data.session);
     if(S.auth&&FROM_LINK){S.auth=false;S.login.mode='setpw'}
-    render()});
-  SB.auth.onAuthStateChange(ev=>{if(ev==='SIGNED_OUT'&&S.auth){S.auth=false;render()}});
+    if(S.auth)sbLoad();else render()});
+  SB.auth.onAuthStateChange(ev=>{if(ev==='SIGNED_OUT'&&S.auth){S.auth=false;S.data=ensure(blankData());S.dbReady=false;S.uid=null;render()}});
+  window.addEventListener('pagehide',()=>{sbFlush()});
 }
 readHash();render();
 })();
