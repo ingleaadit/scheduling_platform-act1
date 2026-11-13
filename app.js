@@ -362,8 +362,8 @@ function vAbout(){const e=S.c.err,s=D().settings;let out='';
   return out+crisis()}
 
 function vConfirm(){const c=S.c,ty=typeOf(c.type);return `<div class="card sec" style="gap:8px"><b style="font-size:17px">${esc(ty.name)} with ${esc(P().name)}</b><span>${esc(fDL(c.slot))}, ${fT(c.slot)} · ${ty.min} min · ${money(ty.fee)}</span><span class="muted" style="font-size:14px">For ${esc(c.d.fn+' '+c.d.ln)} · +91 ${esc(c.d.wa)}</span></div>
-  <div class="sec" style="gap:10px"><h2 class="h2" style="font-size:20px">Informed consent and cancellation policy</h2><div class="policy" tabindex="0" aria-label="Policy text">${policyHtml()}</div>
-  <label class="check" for="agree"><input type="checkbox" id="agree" data-f="c.agree" ${c.agree?'checked':''}><span>I have read and agree to the terms and conditions. <span class="req" aria-hidden="true">*</span></span></label>${c.err.agree?`<span class="err">${esc(c.err.agree)}</span>`:''}</div>`}
+  ${!needIntake()?`<p class="muted" style="margin:0;font-size:15px;line-height:1.5">You can cancel or move this session for free up to ${D().settings.cancelWindow} hours before it starts. After that, ${D().settings.latePct}% of the fee applies.</p>`:`<div class="sec" style="gap:10px"><h2 class="h2" style="font-size:20px">Informed consent and cancellation policy</h2><div class="policy" tabindex="0" aria-label="Policy text">${policyHtml()}</div>
+  <label class="check" for="agree"><input type="checkbox" id="agree" data-f="c.agree" ${c.agree?'checked':''}><span>I have read and agree to the terms and conditions. <span class="req" aria-hidden="true">*</span></span></label>${c.err.agree?`<span class="err">${esc(c.err.agree)}</span>`:''}</div>`}`}
 function policyHtml(){return pol(D().consent).split(/\n\n+/).map(b=>{const lines=b.split('\n');let h='';if(lines[0].startsWith('## ')){h=`<h4>${esc(lines.shift().slice(3))}</h4>`}return h+(lines.length?`<p>${esc(lines.join(' '))}</p>`:'')}).join('')}
 
 function vBooked(){const a=D().appts.find(x=>x.id===S.c.booked);if(!a)return '<p>Booking not found.</p>';const ty=typeOf(a.type);const c=S.c;const s=D().settings;
@@ -857,10 +857,10 @@ function act(a,el){const ds=el.dataset,c=S.c,d=D();if(a!=='calMenu')S.t.calMenu=
     if(c.resched){const b=d.appts.find(x=>x.id===c.resched);b.start=c.slot;b.reminded=false;c.booked=b.id;c.resched=null;go('booked');toast('Session moved to '+fD(b.start)+', '+fT(b.start));save();break}go('details');break;
   case 'toAbout':{const e=valDetails();if(Object.keys(e).length){c.err=e;render();focusErr();return}go(needIntake()?'about':'confirm');break}
   case 'toConfirm':{const e=valAbout();if(Object.keys(e).length){c.err=e;render();focusErr();return}go('confirm');break}
-  case 'book':{if(!c.agree){c.err={agree:'Tick the box to agree before confirming'};render();focusErr();return}const ty=typeOf(c.type);
+  case 'book':{if(needIntake()&&!c.agree){c.err={agree:'Tick the box to agree before confirming'};render();focusErr();return}const ty=typeOf(c.type);
     if(d.appts.some(x=>x.status==='upcoming'&&x.start===c.slot)){toast('That time was just taken. Pick another.');go('time');c.slot=null;break}
     if(SLUG){if(c.sending)return;c.sending=true;toast('Booking your session…');
-      pubPost({kind:'booking',fn:c.d.fn,ln:c.d.ln,email:c.d.email,wa:c.d.wa,type:ty.id,start:c.slot,mode:c.mode||'Online',answers:needIntake()?c.a:{},guardian:needIntake()&&minor()?c.g:null,agree:true,hp:c.d.hp,follow:!needIntake()})
+      pubPost({kind:'booking',fn:c.d.fn,ln:c.d.ln,email:c.d.email,wa:c.d.wa,type:ty.id,start:c.slot,mode:c.mode||'Online',answers:needIntake()?c.a:{},guardian:needIntake()&&minor()?c.g:null,agree:needIntake()?true:undefined,hp:c.d.hp,follow:!needIntake()})
       .then(({st,j})=>{c.sending=false;
         if(j&&j.ok&&j.appt){if(c.remember)meSave(c.d);else meClear();if(j.room)D().settings.room=j.room;j.appt.mail=j.mail;D().appts.push(j.appt);(S.mine=S.mine||[]).push(j.appt);if(j.manage)(S.mg=S.mg||{})[j.appt.id]=j.manage.k;c.booked=j.appt.id;go('booked');toast('Booked');render()}
         else if(st===409){toast('That time was just taken. Pick another.');c.slot=null;go('time');pubLoad()}
@@ -869,7 +869,7 @@ function act(a,el){const ds=el.dataset,c=S.c,d=D();if(a!=='calMenu')S.t.calMenu=
       .catch(()=>{c.sending=false;toast('We could not reach the server. Check your connection and try again.');render()});
       return}
     const b={id:'a'+Date.now(),name:(c.d.fn.trim()+' '+c.d.ln.trim()),wa:'+91 '+c.d.wa.trim(),email:c.d.email.trim(),type:ty.id,start:c.slot,dur:ty.min,fee:ty.fee,status:'upcoming',paid:false,lateFee:0,late:false,reason:'',waived:false,
-      intake:d.intake.map(q=>({label:q.label,answer:String(c.a[q.id]==null?'':c.a[q.id]),private:!!q.private})).filter(q=>q.answer),guardian:minor()?Object.assign({},c.g):null,consentAt:Date.now(),bookedAt:Date.now(),mode:c.mode||'Online',source:'Client page',reminded:false,isNew:true};
+      intake:d.intake.map(q=>({label:q.label,answer:String(c.a[q.id]==null?'':c.a[q.id]),private:!!q.private})).filter(q=>q.answer),guardian:minor()?Object.assign({},c.g):null,consentAt:needIntake()?Date.now():null,bookedAt:Date.now(),mode:c.mode||'Online',source:'Client page',reminded:false,isNew:true};
     d.appts.push(b);c.booked=b.id;go('booked');save();break}
   case 'resched':{c.resched=c.booked;const rb=d.appts.find(x=>x.id===c.booked);c.type=rb.type;c.slot=null;c.day=null;c.cancelAsk=false;go('time');break}
   case 'clientCancel':{const b=d.appts.find(x=>x.id===c.booked);

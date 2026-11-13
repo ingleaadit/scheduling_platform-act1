@@ -219,6 +219,14 @@ test('a follow-up booking stores no first-session answers and needs none', async
   assert.strictEqual(db.inbox[0].payload.dur, 50);
   assert.ok(!JSON.stringify(db.inbox[0]).includes('Should not be stored'));
 });
+test('a follow-up needs no consent tick; a first session still does', async () => {
+  db.inbox = []; db.pub = practice();
+  const f = Object.assign(good(), { type: 'follow' }); delete f.agree;
+  assert.strictEqual((await post(f)).statusCode, 200, 'follow-up without agree is accepted');
+  assert.strictEqual(db.inbox[0].payload.consentAt, null, 'no consent is recorded for a follow-up');
+  db.inbox = []; const first = good(); delete first.agree;
+  assert.strictEqual((await post(first)).statusCode, 400, 'first session without agree is refused');
+});
 test('a first booking still keeps its intake answers', async () => {
   db.inbox = []; await post(good());
   assert.strictEqual(db.inbox[0].payload.intake.length, 2);

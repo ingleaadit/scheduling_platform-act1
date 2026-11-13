@@ -9,11 +9,12 @@ const { DAY, str, sha, slotAllowed, ipHash, overLimit, siteUrl, therapistLabel }
 function buildBooking(data, body) {
   const fn = str(body.fn, 60), ln = str(body.ln, 60), email = str(body.email, 120), wa = str(body.wa, 20).replace(/\D/g, '');
   if (!fn || !ln || !/^\S+@\S+\.\S+$/.test(email) || wa.length !== 10) return { error: 'details' };
-  if (body.agree !== true) return { error: 'agree' };
   const ty = (data.types || []).find((t) => t.id === body.type);
   const start = Number(body.start);
   if (!ty || !Number.isFinite(start)) return { error: 'details' };
   if (start < Date.now() || start > Date.now() + 60 * DAY || !slotAllowed(data, start, ty.min)) return { error: 'slot' };
+  // Informed consent is asked at the first session only; a follow-up needs no agreement.
+  if (ty.id !== 'follow' && body.agree !== true) return { error: 'agree' };
   const answers = body.answers && typeof body.answers === 'object' ? body.answers : {};
   // Returning clients booking a follow-up are not asked the first-session questions, and none are stored.
   const followUp = ty.id === 'follow';
@@ -24,7 +25,7 @@ function buildBooking(data, body) {
   return {
     id, start, end: start + ty.min * 60000, ty,
     appt: { id: 'b' + id, name: fn + ' ' + ln, wa: '+91 ' + wa, email, type: ty.id, start, dur: ty.min, fee: ty.fee, status: 'upcoming', paid: false, lateFee: 0, late: false, reason: '', waived: false,
-      intake, guardian: g && g.name ? g : null, consentAt: now, bookedAt: now, mode: body.mode === 'In person' ? 'In person' : 'Online', source: 'Client page', reminded: false, isNew: true },
+      intake, guardian: g && g.name ? g : null, consentAt: followUp ? null : now, bookedAt: now, mode: body.mode === 'In person' ? 'In person' : 'Online', source: 'Client page', reminded: false, isNew: true },
   };
 }
 
