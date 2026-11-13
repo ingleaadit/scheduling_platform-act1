@@ -125,6 +125,17 @@ const HASH0=location.hash;
 const FROM_LINK=/type=(invite|recovery)/.test(HASH0)&&/access_token=/.test(HASH0);
 if(LIVE==='client'&&FROM_LINK){location.replace('/console'+HASH0)}
 let SB=null;
+/* Real booking page: /?t=<slug> shows one therapist's page from the server and sends bookings to it. Without ?t= the page stays a demo. */
+const SLUG=LIVE==='client'?(new URLSearchParams(location.search).get('t')||'').toLowerCase():'';
+function pubLoad(){S.pubErr='';
+  return fetch('/api/practice?t='+encodeURIComponent(SLUG)).then(r=>r.ok?r.json():Promise.reject(r.status)).then(j=>{const d=blankData(),p=j.data||{};
+    ['profile','types','hours','blocks','intake','consent'].forEach(k=>{if(p[k]!=null)d[k]=p[k]});Object.assign(d.settings,p.settings||{});
+    d.appts=(p.busy||[]).map(([f,t],i)=>({id:'x'+i,name:'',type:d.types[0].id,start:f,dur:Math.round((t-f)/6e4),fee:0,status:'upcoming'}));
+    S.data=ensure(d);S.pubReady=true})
+  .catch(st=>{S.pubErr=st===404?'This booking link is not active. Check the link with your therapist.':'We could not load this page. Check your connection, then try again.'})
+  .then(()=>render())}
+function pubLoadingView(){return `<div class="scr"><div style="padding:48px 28px;display:flex;flex-direction:column;gap:14px;align-items:flex-start"><p class="muted" style="margin:0">${S.pubErr?esc(S.pubErr):'Loading…'}</p>${S.pubErr&&!/not active/.test(S.pubErr)?'<button type="button" class="btn2" data-a="pubretry">Try again</button>':''}</div></div>`}
+function pubPost(body){return fetch('/api/book',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(Object.assign({t:SLUG},body))}).then(r=>r.json().catch(()=>({})).then(j=>({st:r.status,j})))}
 try{if(LIVE==='therapist'&&window.supabase&&window.SUPABASE_URL&&window.SUPABASE_PUBLISHABLE_KEY)SB=window.supabase.createClient(window.SUPABASE_URL,window.SUPABASE_PUBLISHABLE_KEY)}catch(e){SB=null}
 function sbLogin(L){
   if(L.busy)return;
@@ -158,20 +169,42 @@ function sbLoad(){
     const u=data&&data.session&&data.session.user;if(!u)throw new Error('no session');S.uid=u.id;
     return SB.from('practice_data').select('data').eq('practitioner_id',u.id).maybeSingle()})
   .then(({data,error})=>{if(error)throw error;
-    S.data=data&&data.data&&data.data.appts?ensure(data.data):ensure(blankData());S.dbReady=true})
+    S.data=data&&data.data&&data.data.appts?ensure(data.data):ensure(blankData());S.dbReady=true;S.inbox=[];sbQueue();sbInbox()})
   .catch(()=>{S.dbErr='We could not load your data. Check your connection, then try again.'})
   .then(()=>render())}
-function sbQueue(){if(!SB||!S.auth||!S.dbReady)return;clearTimeout(sbT);sbT=setTimeout(sbFlush,1200)}
+function sbQueue(){if(!SB||!S.auth||!S.dbReady)return;S.dirty=true;clearTimeout(sbT);sbT=setTimeout(sbFlush,1200)}
+/* What the booking page may show: no client names, only the times that are taken. */
+function pubData(){const d=S.data,s=d.settings;return {profile:d.profile,types:d.types,hours:d.hours,blocks:d.blocks,intake:d.intake,consent:d.consent,
+  settings:{cancelWindow:s.cancelWindow,latePct:s.latePct,minors:s.minors,gapL:s.gapL,checkin:s.checkin,videoMode:s.videoMode,room:s.room},
+  busy:d.appts.filter(a=>a.status==='upcoming'&&a.start+a.dur*6e4>Date.now()).map(a=>[a.start,a.start+a.dur*6e4]),tzOff:new Date().getTimezoneOffset()}}
+/* The link's name. It is fixed once the therapist has entered their own name, so shared links keep working. */
+function sbSlug(){const s=S.data.settings;if(s.slug)return s.slug;const named=P().name&&P().name!=='Your name';
+  const v=((named?P().name:'practice').toLowerCase().normalize('NFKD').replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,40)||'practice')+'-'+String(S.uid).replace(/-/g,'').slice(0,6);
+  if(named)s.slug=v;return v}
+const bookUrl=()=>location.origin+'/?t='+sbSlug();
 function sbFlush(){clearTimeout(sbT);
   if(!SB||!S.auth||!S.dbReady||!S.uid)return Promise.resolve();
-  return SB.from('practice_data').upsert({practitioner_id:S.uid,data:S.data,updated_at:new Date().toISOString()})
-    .then(({error})=>{if(error)toast('Could not save. Check your connection.')},()=>toast('Could not save. Check your connection.'))}
+  S.dirty=false;const slug=sbSlug(),done=(S.inbox||[]).slice(),now=new Date().toISOString();
+  return SB.from('practice_data').upsert({practitioner_id:S.uid,data:S.data,updated_at:now})
+    .then(({error})=>{if(error)throw error;return SB.from('practice_public').upsert({practitioner_id:S.uid,slug,data:pubData(),updated_at:now})})
+    .then(({error})=>{if(error)throw error;if(!done.length)return;
+      /* Saved, so the inbox copies are no longer needed: mark them imported and empty them. */
+      return SB.from('booking_inbox').update({imported_at:now,payload:{}}).in('id',done).then(({error})=>{if(!error)S.inbox=(S.inbox||[]).filter(id=>!done.includes(id))})})
+    .catch(()=>toast('Could not save. Check your connection.'))}
+/* Bookings and waitlist requests made on the booking page wait in an inbox until the console copies them in. */
+function sbInbox(){if(!SB||!S.auth||!S.dbReady||document.hidden)return Promise.resolve();
+  return SB.from('booking_inbox').select('id,kind,payload').is('imported_at',null).order('created_at').then(({data,error})=>{if(error||!data||!data.length)return;
+    let n=0;S.inbox=S.inbox||[];
+    data.forEach(r=>{const p=r.payload||{};if(!p.id)return;const list=r.kind==='waitlist'?S.data.waitlist:S.data.appts;
+      if(!list.some(x=>x.id===p.id)){list.push(p);n++}if(!S.inbox.includes(r.id))S.inbox.push(r.id)});
+    sbQueue();
+    if(n){toast(n===1?'New request from your booking page':n+' new requests from your booking page');const tg=(document.activeElement||{}).tagName||'';if(!S.modal&&!/INPUT|TEXTAREA|SELECT/.test(tg))render()}},()=>{})}
 function sbLoadingView(){return `<div class="scr"><div style="padding:48px 28px;display:flex;flex-direction:column;gap:14px;align-items:flex-start"><p class="muted" style="margin:0">${S.dbErr?esc(S.dbErr):'Loading your practice…'}</p>${S.dbErr?'<button type="button" class="btn2" data-a="sbretry">Try again</button> <button type="button" class="linkbtn" data-a="logout" style="padding:0">Log out</button>':''}</div></div>`}
 let S=fresh();
 try{S.auth=localStorage.getItem(KEY+'-auth')==='1'}catch(e){}
 try{const raw=localStorage.getItem(KEY);if(raw){const p=JSON.parse(raw);if(p&&p.data&&p.data.appts&&p.v===1){S.data=ensure(p.data);if(p.t)Object.assign(S.t,p.t)}}}catch(e){}
-function save(){if(SB){sbQueue();return}try{localStorage.setItem(KEY,JSON.stringify({v:1,data:S.data,t:{freed:S.t.freed,hide:S.t.hide}}));localStorage.setItem(KEY+'-auth',S.auth?'1':'0')}catch(e){}}
-function applyPal(){const p=PALS.find(x=>x.id===(S.data.settings.palette||'neem'))||PALS[0];let css='';
+function save(){if(SLUG)return;if(SB){sbQueue();return}try{localStorage.setItem(KEY,JSON.stringify({v:1,data:S.data,t:{freed:S.t.freed,hide:S.t.hide}}));localStorage.setItem(KEY+'-auth',S.auth?'1':'0')}catch(e){}}
+function applyPal(){const p=PALS.find(x=>x.id==='inksand');let css='';
   if(p.id!=='neem'){const L=`--accent:${p.l};--accent-hover:color-mix(in srgb,${p.l} 84%,#000);--soft:${p.s||`color-mix(in srgb,${p.l} 14%,#FFFFFF)`};--panel:${p.s?`color-mix(in srgb,${p.s} 32%,#F7F8F8)`:`color-mix(in srgb,${p.l} 6%,#F6F7F7)`};${p.h?`--head:${p.h};`:''}--canvas:color-mix(in srgb,${p.l} 6%,#F1F2F2);--bg:color-mix(in srgb,${p.l} 2%,#FFFFFF);--line:color-mix(in srgb,${p.l} 14%,#D4D7D6);--text2:color-mix(in srgb,${p.l} 22%,#575C5A);`;
     const Dk=`--accent:${p.d};--accent-hover:color-mix(in srgb,${p.d} 84%,#FFF);--soft:color-mix(in srgb,${p.d} 20%,#141716);--panel:color-mix(in srgb,${p.d} 8%,#191C1B);--canvas:color-mix(in srgb,${p.d} 4%,#0C0E0D);--bg:color-mix(in srgb,${p.d} 4%,#121414);--card:color-mix(in srgb,${p.d} 6%,#1E2120);--line:color-mix(in srgb,${p.d} 18%,#323736);--text2:color-mix(in srgb,${p.d} 18%,#A6ABA9);${p.hd?`--head:${p.hd};`:''}`;
     css=`:root{${L}}@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){${Dk}}}:root[data-theme="dark"]{${Dk}}`}
@@ -230,7 +263,7 @@ function render(){
   const key=S.view+S.device+(S.view==='client'?S.c.step:(S.auth?S.t.tab+(S.t.person||''):'login'));
   const sc=document.querySelector('#stage .scr');const keep=key===lastKey?(sc?sc.scrollTop:window.scrollY):null;
   const isM=S.device==='phone';
-  const inner=S.view==='client'?(isM?clientPhone():clientDesk()):(SB&&!S.sbReady)?'<div class="scr"><p class="muted" style="padding:40px">Loading…</p></div>':!S.auth?signIn(isM):(SB&&!S.dbReady)?sbLoadingView():(isM?therPhone():therDesk());
+  const inner=S.view==='client'?(SLUG&&!S.pubReady?pubLoadingView():isM?clientPhone():clientDesk()):(SB&&!S.sbReady)?'<div class="scr"><p class="muted" style="padding:40px">Loading…</p></div>':!S.auth?signIn(isM):(SB&&!S.dbReady)?sbLoadingView():(isM?therPhone():therDesk());
   const modal=S.modal?renderModal():'';
   const stage=document.getElementById('stage');
   rendering=true;try{const fe=document.activeElement;if(fe&&stage.contains(fe)&&fe.blur)fe.blur()}finally{rendering=false}
@@ -312,13 +345,13 @@ function vBooked(){const a=D().appts.find(x=>x.id===S.c.booked);if(!a)return '<p
   const lateNow=a.start-Date.now()<s.cancelWindow*36e5;
   if(a.status==='cancelled')return `<div class="sec" style="max-width:640px"><h1 style="font-size:34px">Session cancelled</h1><p class="muted" style="margin:0;font-size:17px;line-height:1.5">${esc(fDL(a.start))}, ${fT(a.start)} is cancelled. ${a.lateFee?`A late cancellation fee of ${money(a.lateFee)} applies, as in the policy.`:'No fee applies.'}</p><div><button class="btn" data-a="startBook">Book another time</button></div></div>`;
   return `<div class="sec" style="max-width:680px;gap:18px"><span class="av" style="width:56px;height:56px;font-size:26px">✓</span><h1 style="font-size:${S.device==='phone'?'32px':'40px'}">You’re booked, ${esc(firstName(a.name))}</h1>
-  <p class="muted" style="margin:0;font-size:17px;line-height:1.5">${esc(firstName(P().name))} will confirm on WhatsApp and send a reminder the day before.${a.guardian?' She will also contact your parent or guardian for consent.':''}</p>
-  <div class="card"><dl class="kv"><dt>Session</dt><dd>${esc(ty.name)}, ${ty.min} min</dd><dt>When</dt><dd>${esc(fDL(a.start))}, ${fT(a.start)}</dd><dt>Where</dt><dd>${videoFor(a)?`Online. Video link: <a href="https://${videoFor(a)}" target="_blank" rel="noopener">${esc(videoFor(a))}</a>`:esc(P().where.replace(/^Online, and in person in /,''))}</dd><dt>Fee</dt><dd>${money(a.fee)}, by UPI after the session. A payment link comes on WhatsApp.</dd><dt>WhatsApp</dt><dd>${esc(a.wa)}</dd></dl></div>
-  ${c.cancelAsk?`<div class="panel sec"><b>Cancel this session?</b>${lateNow?`<div class="note warn">It starts in less than ${s.cancelWindow} hours, so a fee of ${money(Math.round(a.fee*s.latePct/100))} applies.</div>`:'<span class="muted">No fee applies.</span>'}
+  <p class="muted" style="margin:0;font-size:17px;line-height:1.5">${SLUG?(a.mail==='sent'?`A confirmation email is on its way to ${esc(a.email)}.`:`${esc(firstName(P().name))} has your booking and will be in touch to confirm.`):`${esc(firstName(P().name))} will confirm on WhatsApp and send a reminder the day before.`}${a.guardian?' She will also contact your parent or guardian for consent.':''}</p>
+  <div class="card"><dl class="kv"><dt>Session</dt><dd>${esc(ty.name)}, ${ty.min} min</dd><dt>When</dt><dd>${esc(fDL(a.start))}, ${fT(a.start)}</dd><dt>Where</dt><dd>${videoFor(a)?`Online. Video link: <a href="https://${videoFor(a)}" target="_blank" rel="noopener">${esc(videoFor(a))}</a>`:SLUG&&a.mode!=='In person'?`Online. ${esc(firstName(P().name))} will send the video link before the session.`:esc(P().where.replace(/^Online, and in person in /,''))}</dd><dt>Fee</dt><dd>${money(a.fee)}, by UPI after the session.${SLUG?'':' A payment link comes on WhatsApp.'}</dd><dt>WhatsApp</dt><dd>${esc(a.wa)}</dd></dl></div>
+  ${SLUG?`<p class="muted" style="margin:0;font-size:14px">To change or cancel, ${a.mail==='sent'?'reply to the confirmation email':'contact '+esc(firstName(P().name))}. It is free until ${esc(fD(a.start-s.cancelWindow*36e5))}, ${fT(a.start-s.cancelWindow*36e5)}.</p>`:c.cancelAsk?`<div class="panel sec"><b>Cancel this session?</b>${lateNow?`<div class="note warn">It starts in less than ${s.cancelWindow} hours, so a fee of ${money(Math.round(a.fee*s.latePct/100))} applies.</div>`:'<span class="muted">No fee applies.</span>'}
     ${chips('c.cancelReason',REASONS,'Reason, optional')}<div style="display:flex;gap:10px;flex-wrap:wrap"><button class="btn" data-a="clientCancel">Cancel session</button><button class="btn2" data-a="set" data-k="c.cancelAsk" data-v="">Keep it</button></div></div>`
   :`<div style="display:flex;gap:10px;flex-wrap:wrap"><button class="btn2" data-a="resched">Reschedule</button><button class="btn2" data-a="set" data-k="c.cancelAsk" data-v="1">Cancel</button></div>
     <p class="muted" style="margin:0;font-size:13px">Free to cancel or move until ${esc(fD(a.start-s.cancelWindow*36e5))}, ${fT(a.start-s.cancelWindow*36e5)}.</p>`}
-  <p class="muted" style="margin:0;font-size:13px">Switch to the Therapist window to see this booking arrive.</p></div>`}
+  ${LIVE?'':'<p class="muted" style="margin:0;font-size:13px">Switch to the Therapist window to see this booking arrive.</p>'}</div>`}
 
 function vWaitlist(){const w=S.c.wl,e=S.c.err;if(S.c.wlDone)return `<div class="sec" style="max-width:620px"><span class="av" style="width:56px;height:56px;font-size:26px">✓</span><h1 style="font-size:34px">You’re on the waitlist</h1><p class="muted" style="margin:0;font-size:17px;line-height:1.5">When a ${esc(w.days.toLowerCase())} slot in the ${esc(w.times.toLowerCase())} opens, you’ll get a WhatsApp message. Reply STOP at any time to leave.</p><div><button class="btn2" data-a="go" data-v="intro">Back to ${esc(firstName(P().name))}’s page</button></div></div>`;
   return `<div class="sec" style="gap:18px;max-width:680px"><p class="muted" style="margin:0;font-size:17px;line-height:1.5">When a session frees up at a time that suits you, you get a WhatsApp message with the time. Take it or let it pass.</p>
@@ -525,9 +558,9 @@ function tHours(){return `<div class="ttl"><div><h1>Working hours</h1><p>Split a
   ${blockPanel()}`}
 
 function tProfile(){const s=D().settings;return `<div class="ttl"><div><h1>Profile and booking page</h1><p>Everything clients see. Changes show on your page straight away.</p></div><button class="btn2" data-a="previewClient" style="height:42px;font-size:15px">View my page</button></div>
+  ${SB?`<section class="panel sec"><h2 class="h2">Your booking link</h2><p class="muted" style="margin:-6px 0 0;font-size:14px">Share this with clients. Bookings made here appear in your console.${s.slug?'':' The link takes your name once you enter it below, so set your name before sharing.'}</p><div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><code id="booklink" style="font-size:14px;word-break:break-all">${esc(bookUrl())}</code><button type="button" class="mini" data-a="copy" data-src="booklink">Copy</button></div></section>`:''}
   <section class="panel sec"><h2 class="h2">About you</h2><div class="grid2">${field('pn','Name','data.profile.name',{req:false})}${field('pt','Title','data.profile.title',{req:false})}</div>
    ${field('pa','About','data.profile.about',{type:'long',req:false})}<div class="grid3">${field('pap','Approach','data.profile.approach',{req:false})}${field('pl','Languages','data.profile.langs',{req:false})}${field('pe','Experience','data.profile.exp',{req:false})}</div>${field('pw','Where you see clients','data.profile.where',{req:false})}</section>
-  <section class="panel sec"><h2 class="h2">Colours</h2><p class="muted" style="margin:-6px 0 0;font-size:14px">Used on your console and your booking page. Each has a matching dark mode version.</p>${swatches()}</section>
   <section class="panel sec"><h2 class="h2">Sessions and fees</h2>${D().types.map((t,i)=>`<div class="grid3" style="align-items:end">${field('tn'+i,'Name','data.types.'+i+'.name',{req:false})}<div class="f"><label for="tm${i}">Length</label><select class="in" id="tm${i}" data-f="data.types.${i}.min" data-num="1">${[30,45,50,60,75,90].map(m=>`<option value="${m}" ${m===t.min?'selected':''}>${m} min</option>`).join('')}</select></div>${field('tf'+i,'Fee in ₹','data.types.'+i+'.fee',{req:false,type:'number',mode:'numeric'})}</div>`).join('')}</section>
   <section class="panel sec"><h2 class="h2">Payments, video and check-ins</h2>
    ${field('upi','Your UPI ID','data.settings.upi',{req:false,hint:'Payment links open the client’s UPI app with your ID and the fee filled in.'})}
@@ -665,8 +698,8 @@ function findResults(q){q=(q||'').trim().toLowerCase();const cl=clientList().fil
     +(acts.length?`<p class="muted" style="margin:8px 0 0;font-size:13px;font-weight:600">Add or do</p>`+acts.map(a=>`<div class="crow"><button class="linkbtn prow" data-a="${a[1]}" ${a[1]==='tab'?`data-v="${a[2]}"`:`data-from="${a[2]}"`}><b>${a[0]}</b><small>${a[3]}</small></button></div>`).join(''):'')
     +(!cl.length&&!acts.length?`<p class="muted" style="margin:8px 0">Nothing matches that. You can add them as a new client.</p><div><button class="mini pri" data-a="newAp" data-from="clients">Add a new client</button></div>`:'')}
 function therBody(){const tb=S.t.tab;if(PAID_TABS[tb]&&!paid())return paywall(tb);return tb==='people'?tPeople():tb==='schedule'?tSchedule():tb==='appts'?tAppts():tb==='insights'?tInsights():tb==='waitlist'?tWaitlist():tb==='log'?tLog():tb==='messages'?tMessages():tb==='hours'?tHours():tb==='profile'?tProfile():tb==='apps'?tApps():tb==='payments'?tPayments():tb==='notifs'?tNotifs():tMore()}
-function tMore(){return `<div class="ttl"><div><h1>Account</h1></div></div>${planPanel()}<div class="mlist">${[['notifs','Notifications',unread()?unread()+' new':''],['apps','Connected apps',[D().connect.gcal.on?'Calendar':'',D().connect.wa.on?'WhatsApp':''].filter(Boolean).join(', ')||'Not set up'],['payments','Payments',D().appts.filter(a=>due(a)>0).length+' due'],['waitlist','Waitlist',D().waitlist.length+' waiting'],['log','Training log',''],['hours','Working hours',''],['profile','Profile and booking page','']].map(([k,l,x])=>`<button data-a="tab" data-v="${k}"><span>${l}</span><span class="muted">${x} ›</span></button>`).join('')}<button data-a="colours"><span>Colours</span><span class="muted">${esc((PALS.find(p=>p.id===(D().settings.palette||'neem'))||PALS[0]).name)} ›</span></button><button data-a="hide"><span>Hide names</span><span class="muted">${S.t.hide?'On':'Off'}</span></button><button data-a="logout"><span>Log out</span><span class="muted">›</span></button></div>`}
-function therDesk(){return `<header class="tnav"><b style="font-weight:600">Practice console · ${esc(P().name)}</b><span class="tnav-r"><button class="mini${S.t.tab==='notifs'?' on':''}" data-a="tab" data-v="notifs" aria-label="Notifications, ${unread()} unread">${icon('bell')}${unread()?`<span class="badge">${unread()}</span>`:''}</button><button class="mini${S.t.hide?' on':''}" data-a="hide" aria-pressed="${S.t.hide}">Hide names</button><button class="mini" data-a="colours">Colours</button><button class="mini" data-a="previewClient">View my page</button><button class="mini" data-a="logout">Log out</button></span></header>
+function tMore(){return `<div class="ttl"><div><h1>Account</h1></div></div>${planPanel()}<div class="mlist">${[['notifs','Notifications',unread()?unread()+' new':''],['apps','Connected apps',[D().connect.gcal.on?'Calendar':'',D().connect.wa.on?'WhatsApp':''].filter(Boolean).join(', ')||'Not set up'],['payments','Payments',D().appts.filter(a=>due(a)>0).length+' due'],['waitlist','Waitlist',D().waitlist.length+' waiting'],['log','Training log',''],['hours','Working hours',''],['profile','Profile and booking page','']].map(([k,l,x])=>`<button data-a="tab" data-v="${k}"><span>${l}</span><span class="muted">${x} ›</span></button>`).join('')}<button data-a="hide"><span>Hide names</span><span class="muted">${S.t.hide?'On':'Off'}</span></button><button data-a="logout"><span>Log out</span><span class="muted">›</span></button></div>`}
+function therDesk(){return `<header class="tnav"><b style="font-weight:600">Practice console · ${esc(P().name)}</b><span class="tnav-r"><button class="mini${S.t.tab==='notifs'?' on':''}" data-a="tab" data-v="notifs" aria-label="Notifications, ${unread()} unread">${icon('bell')}${unread()?`<span class="badge">${unread()}</span>`:''}</button><button class="mini${S.t.hide?' on':''}" data-a="hide" aria-pressed="${S.t.hide}">Hide names</button><button class="mini" data-a="previewClient">View my page</button><button class="mini" data-a="logout">Log out</button></span></header>
   <div class="twrap"><div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;justify-content:space-between"><nav class="tabs places" aria-label="Sections">${placeNav()}</nav><button class="findbtn" data-a="find"><span aria-hidden="true" style="font-size:20px;line-height:1">+</span>Find a client or add something</button></div>${subnav()}${therBody()}</div>`}
 function therPhone(){const tb=S.t.tab,pl=placeOf(tb);const title=tb==='notifs'?'Notifications':pl[0]==='today'?'Today':SUBL[tb]||pl[1];
   return `<header class="mhead"><b>${esc(title)}</b><span style="display:flex;gap:6px"><button class="mini${tb==='notifs'?' on':''}" data-a="tab" data-v="notifs" aria-label="Notifications, ${unread()} unread">${icon('bell')}${unread()?`<span class="badge">${unread()}</span>`:''}</button><button class="mini${S.t.hide?' on':''}" data-a="hide" aria-pressed="${S.t.hide}">Hide names</button></span></header>
@@ -760,6 +793,7 @@ function act(a,el){const ds=el.dataset,c=S.c,d=D();if(a!=='calMenu')S.t.calMenu=
   case 'view':S.view=ds.v;S.modal=null;setHash();break;
   case 'device':S.device=ds.v;S.modal=null;if(ds.v==='desktop'&&S.t.tab==='more')S.t.tab='schedule';setHash();break;
   case 'sbretry':if(SB)sbLoad();break;
+  case 'pubretry':if(SLUG)pubLoad();break;
   case 'reset':if(SB)break;S=Object.assign(fresh(),{view:S.view,device:S.device});save();toast('Demo reset to example data');break;
   case 'set':{let v=ds.v;const cur=getPath(ds.k);if(ds.k==='c.cancelReason'||ds.k==='modal.reason'){if(cur===v)v=''}setPath(ds.k,v==='' && (ds.k==='c.cancelAsk'||ds.k==='modal.cancel'||ds.k==='modal.show')?false:v);if(ds.k.startsWith('c.a.'))delete c.err[ds.k.slice(4)];break}
   case 'go':if(ds.v==='waitlist'){c.wlFrom=c.step;c.wlDone=false}go(ds.v);if(ds.v==='intro'){c.resched=null;c.wlDone=false}break;
@@ -773,12 +807,25 @@ function act(a,el){const ds=el.dataset,c=S.c,d=D();if(a!=='calMenu')S.t.calMenu=
   case 'toConfirm':{const e=valAbout();if(Object.keys(e).length){c.err=e;render();focusErr();return}go('confirm');break}
   case 'book':{if(!c.agree){c.err={agree:'Tick the box to agree before confirming'};render();focusErr();return}const ty=typeOf(c.type);
     if(d.appts.some(x=>x.status==='upcoming'&&x.start===c.slot)){toast('That time was just taken. Pick another.');go('time');c.slot=null;break}
+    if(SLUG){if(c.sending)return;c.sending=true;toast('Booking your session…');
+      pubPost({kind:'booking',fn:c.d.fn,ln:c.d.ln,email:c.d.email,wa:c.d.wa,type:ty.id,start:c.slot,mode:c.mode||'Online',answers:c.a,guardian:minor()?c.g:null,agree:true})
+      .then(({st,j})=>{c.sending=false;
+        if(j&&j.ok&&j.appt){if(j.room)D().settings.room=j.room;j.appt.mail=j.mail;D().appts.push(j.appt);c.booked=j.appt.id;go('booked');toast('Booked');render()}
+        else if(st===409){toast('That time was just taken. Pick another.');c.slot=null;go('time');pubLoad()}
+        else{toast('We could not book that. Check your details and try again.');render()}})
+      .catch(()=>{c.sending=false;toast('We could not reach the server. Check your connection and try again.');render()});
+      return}
     const b={id:'a'+Date.now(),name:(c.d.fn.trim()+' '+c.d.ln.trim()),wa:'+91 '+c.d.wa.trim(),email:c.d.email.trim(),type:ty.id,start:c.slot,dur:ty.min,fee:ty.fee,status:'upcoming',paid:false,lateFee:0,late:false,reason:'',waived:false,
       intake:d.intake.map(q=>({label:q.label,answer:String(c.a[q.id]==null?'':c.a[q.id]),private:!!q.private})).filter(q=>q.answer),guardian:minor()?Object.assign({},c.g):null,consentAt:Date.now(),bookedAt:Date.now(),mode:c.mode||'Online',source:'Client page',reminded:false,isNew:true};
     d.appts.push(b);c.booked=b.id;go('booked');save();break}
   case 'resched':{c.resched=c.booked;const rb=d.appts.find(x=>x.id===c.booked);c.type=rb.type;c.slot=null;c.day=null;c.cancelAsk=false;go('time');break}
   case 'clientCancel':{const b=d.appts.find(x=>x.id===c.booked);cancelAppt(b,c.cancelReason||'Other');c.cancelAsk=false;save();break}
   case 'joinWl':{const w=c.wl,e={};if(!w.fn.trim())e.fn='Enter your first name';if(!w.ln.trim())e.ln='Enter your last name';if(w.wa.replace(/\D/g,'').length!==10)e.wa='Enter a 10-digit number';if(Object.keys(e).length){c.err=e;render();focusErr();return}
+    if(SLUG){if(c.sending)return;c.sending=true;c.err={};
+      pubPost({kind:'waitlist',fn:w.fn,ln:w.ln,wa:w.wa,days:w.days,times:w.times,type:w.type})
+      .then(({j})=>{c.sending=false;if(j&&j.ok)c.wlDone=true;else toast('We could not add you. Check your details and try again.');render()})
+      .catch(()=>{c.sending=false;toast('We could not reach the server. Check your connection and try again.');render()});
+      return}
     d.waitlist.push({id:'w'+Date.now(),name:w.fn.trim()+' '+w.ln.trim(),wa:'+91 '+w.wa,days:w.days,times:w.times,type:w.type,joined:Date.now(),source:'Client page',offered:null});c.err={};c.wlDone=true;save();break}
   /* therapist */
   case 'tab':S.t.tab=ds.v;S.modal=null;if(ds.v==='people')S.t.person=null;break;
@@ -793,8 +840,8 @@ function act(a,el){const ds=el.dataset,c=S.c,d=D();if(a!=='calMenu')S.t.calMenu=
     save();toast(`${n} client${n===1?'':'s'} added${skip?`, ${skip} line${skip===1?'':'s'} skipped`:''}`);S.modal=null;S.t.tab='people';S.t.person=null;break}
   case 'find':S.modal={kind:'find',q:''};setTimeout(()=>{const i=document.getElementById('findq');if(i)i.focus()},60);break;
   case 'hide':S.t.hide=!S.t.hide;save();break;
-  case 'previewClient':if(LIVE){window.open('index.html','_blank','noopener');break}S.view='client';S.c=newClient();setHash();break;
-  case 'logout':if(SB){sbFlush().then(()=>SB.auth.signOut());S.data=ensure(blankData());S.dbReady=false;S.uid=null}S.auth=false;S.login=newLogin();S.modal=null;S.t.tab='schedule';save();toast('Logged out');break;
+  case 'previewClient':if(SB){window.open(bookUrl(),'_blank','noopener');break}if(LIVE){window.open('index.html','_blank','noopener');break}S.view='client';S.c=newClient();setHash();break;
+  case 'logout':if(SB){(S.dirty?Promise.race([sbFlush(),new Promise(r=>setTimeout(r,2500))]):Promise.resolve()).then(()=>SB.auth.signOut());S.data=ensure(blankData());S.dbReady=false;S.uid=null}S.auth=false;S.login=newLogin();S.modal=null;S.t.tab='schedule';save();toast('Logged out');break;
   case 'colours':S.modal={kind:'colours'};break;
   case 'pal':d.settings.palette=ds.v;save();break;
   case 'provider':S.login.note=ds.v+' sign-in isn’t connected in this prototype. Use the demo login below.';S.login.err='';break;
@@ -910,15 +957,17 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape'&&S.modal){S.modal=nu
 function setHash(){if(LIVE)return;const h=S.view+'-'+S.device;if(location.hash!=='#'+h){try{history.replaceState(null,'','#'+h)}catch(e){location.hash=h}}}
 function readHash(){if(LIVE){S.view=LIVE;S.device=window.innerWidth<700?'phone':'desktop';return}const m=/^#(client|therapist)-(desktop|phone)$/.exec(location.hash);if(m){S.view=m[1];S.device=m[2]}else{S.device=window.innerWidth<640?'phone':'desktop'}}
 window.addEventListener('hashchange',()=>{readHash();S.modal=null;render()});
-if(LIVE){document.body.classList.add('live');document.getElementById('livebar').hidden=!!SB;if(LIVE==='therapist'&&!SB)document.getElementById('livereset').hidden=false;
+if(LIVE){document.body.classList.add('live');document.getElementById('livebar').hidden=!!SB||!!SLUG;if(LIVE==='therapist'&&!SB)document.getElementById('livereset').hidden=false;
   window.addEventListener('resize',()=>{const dv=window.innerWidth<700?'phone':'desktop';if(dv!==S.device){S.device=dv;S.modal=null;render()}});
-  window.addEventListener('storage',e=>{if(e.key!==KEY||!e.newValue)return;try{const p=JSON.parse(e.newValue);if(p&&p.data){S.data=p.data;ensure(S.data);const tg=(document.activeElement||{}).tagName||'';if(!S.modal&&!/INPUT|TEXTAREA|SELECT/.test(tg))render()}}catch(_){}})}
+  window.addEventListener('storage',e=>{if(SB||SLUG||e.key!==KEY||!e.newValue)return;try{const p=JSON.parse(e.newValue);if(p&&p.data){S.data=p.data;ensure(S.data);const tg=(document.activeElement||{}).tagName||'';if(!S.modal&&!/INPUT|TEXTAREA|SELECT/.test(tg))render()}}catch(_){}})}
 if(SB){S.auth=false;
   SB.auth.getSession().then(({data})=>{S.sbReady=true;S.auth=!!(data&&data.session);
     if(S.auth&&FROM_LINK){S.auth=false;S.login.mode='setpw'}
     if(S.auth)sbLoad();else render()});
   SB.auth.onAuthStateChange(ev=>{if(ev==='SIGNED_OUT'&&S.auth){S.auth=false;S.data=ensure(blankData());S.dbReady=false;S.uid=null;render()}});
   window.addEventListener('pagehide',()=>{sbFlush()});
+  setInterval(sbInbox,45000);document.addEventListener('visibilitychange',()=>{if(!document.hidden)sbInbox()});
 }
+if(SLUG)pubLoad();
 readHash();render();
 })();
