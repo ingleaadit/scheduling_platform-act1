@@ -239,12 +239,13 @@ test('a payment cannot be reported for a cancelled session', async () => {
   await mg(Object.assign({}, m, { action: 'cancel' }));
   assert.strictEqual((await mgPaid(m, '123456789012')).statusCode, 409);
 });
-test('emails show the UPI id, and say "your therapist" while the name is still the placeholder', async () => {
+test('emails do not print the UPI id next to the fee, and say "your therapist" while the name is still the placeholder', async () => {
   db.inbox = []; db.pub = practice(); db.pub.profile.name = 'Your name'; db.pub.settings.room = ''; process.env.RESEND_API_KEY = 'k';
   const sent = []; const realFetch = global.fetch; global.fetch = async (u, o) => { sent.push(JSON.parse(o.body)); return { ok: true, status: 200 }; };
   await post(good());
   global.fetch = realFetch; delete process.env.RESEND_API_KEY;
-  assert.match(sent[0].text, /asha@okaxis/);
+  assert.ok(!/asha@okaxis/.test(sent[0].html + sent[0].text), 'no UPI id in the email');
+  assert.match(sent[0].text, /by UPI after the session/);
   assert.match(sent[0].text, /Your therapist will send the video link/);
   assert.ok(!/Your will/.test(sent[0].html + sent[0].text));
   assert.match(sent[0].subject, /with your therapist is booked/);

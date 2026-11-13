@@ -88,7 +88,7 @@ module.exports = async (req, res) => {
       const therapistAddr = t.rows.length ? t.rows[0].email : '';
       const s = data.settings || {}, prof = data.profile || {};
       const info = { clientName: b.appt.name, therapistName: therapistLabel(prof), typeName: b.ty.name, min: b.ty.min, start: b.start, tzOff: data.tzOff, mode: b.appt.mode,
-        where: String(prof.where || '').replace(/^Online, and in person in /, ''), room: s.room, fee: b.ty.fee, upi: s.upi, cancelWindow: s.cancelWindow, latePct: s.latePct,
+        where: String(prof.where || '').replace(/^Online, and in person in /, ''), room: s.room, fee: b.ty.fee, cancelWindow: s.cancelWindow, latePct: s.latePct,
         manageUrl: siteUrl() ? `${siteUrl()}/?t=${slug}&b=${b.id}&k=${key}` : '' };
       mail = await sendMail(Object.assign({ to: b.appt.email, replyTo: therapistAddr }, confirmationEmail(info)));
       await sendMail(Object.assign({ to: therapistAddr }, therapistEmail(info)));

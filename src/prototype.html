@@ -781,16 +781,15 @@ function vBooked(){const a=D().appts.find(x=>x.id===S.c.booked);if(!a)return '<p
     <p class="muted" style="margin:0;font-size:13px">Free to cancel or move until ${esc(fD(a.start-s.cancelWindow*36e5))}, ${fT(a.start-s.cancelWindow*36e5)}.</p>`}
   ${LIVE?'':'<p class="muted" style="margin:0;font-size:13px">Switch to the Therapist window to see this booking arrive.</p>'}</div>`}
 
-/* Pay by UPI straight to the therapist. There is no payment company in between: the client pays from their own UPI app, then can enter the 12-digit reference (UTR) so the therapist can match it. */
+/* Pay by UPI straight to the therapist. There is no payment company in between: the client pays from their own UPI app, then can tap once to tell the therapist. */
 function payBox(a,s){if(a.claimed)return `<div class="note"><b>Thank you.</b><br>${esc(tName(true))} will mark this paid once it shows in their account.</div>`;
   const link='upi://pay?pa='+encodeURIComponent(s.upi)+'&pn='+encodeURIComponent(P().name&&P().name!=='Your name'?P().name:'Therapist')+'&am='+encodeURIComponent(a.fee)+'&cu=INR&tn='+encodeURIComponent('Session '+fD(a.start));
-  const e=S.c.err||{};
   return `<div class="card sec" style="gap:12px;max-width:680px"><b style="font-size:17px">Pay ${money(a.fee)} now by UPI</b>
     <span class="muted" style="font-size:14px;line-height:1.5">Optional. You can also pay after the session. The money goes straight to ${esc(tName())}.</span>
     <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><code id="upiid" style="font-size:16px;word-break:break-all">${esc(s.upi)}</code><button type="button" class="mini" data-a="copy" data-src="upiid">Copy UPI ID</button></div>
     <div><a class="btn" href="${esc(link)}" style="text-decoration:none;display:inline-flex;align-items:center">Open my UPI app</a></div>
     <span class="muted" style="font-size:13px;line-height:1.5">On a phone this opens your UPI app with the amount filled in. On a computer, copy the UPI ID and pay from your phone.</span>
-    ${(S.mg||{})[a.id]?`<div class="sec" style="gap:8px">${field('utr','After paying: UPI reference (UTR), optional','c.utr',{req:false,mode:'numeric',ph:'12 digits',err:e.utr,hint:'In your UPI app under the payment details. It helps '+tName()+' match your payment.'})}<div><button type="button" class="btn2" data-a="payClaim">I have paid</button></div></div>`:''}</div>`}
+    ${(S.mg||{})[a.id]?`<div class="sec" style="gap:6px"><div><button type="button" class="btn2" data-a="payClaim">I have paid</button></div><span class="muted" style="font-size:13px;line-height:1.5">One tap. It only tells ${esc(tName())}; they mark it paid once it reaches their account.</span></div>`:''}</div>`}
 function vWaitlist(){const w=S.c.wl,e=S.c.err;if(S.c.wlDone)return `<div class="sec" style="max-width:620px"><span class="av" style="width:56px;height:56px;font-size:26px">✓</span><h1 style="font-size:34px">You’re on the waitlist</h1><p class="muted" style="margin:0;font-size:17px;line-height:1.5">When a ${esc(w.days.toLowerCase())} slot in the ${esc(w.times.toLowerCase())} opens, you’ll get a WhatsApp message. Reply STOP at any time to leave.</p><div><button class="btn2" data-a="go" data-v="intro">Back to ${esc(firstName(P().name))}’s page</button></div></div>`;
   return `<div class="sec" style="gap:18px;max-width:680px"><p class="muted" style="margin:0;font-size:17px;line-height:1.5">When a session frees up at a time that suits you, you get a WhatsApp message with the time. Take it or let it pass.</p>
   <div class="grid2">${field('wfn','First name','c.wl.fn',{err:e.fn})}${field('wln','Last name','c.wl.ln',{err:e.ln})}</div>
@@ -1232,8 +1231,7 @@ function act(a,el){const ds=el.dataset,c=S.c,d=D();if(a!=='calMenu')S.t.calMenu=
   case 'view':S.view=ds.v;S.modal=null;setHash();break;
   case 'device':S.device=ds.v;S.modal=null;if(ds.v==='desktop'&&S.t.tab==='more')S.t.tab='schedule';setHash();break;
   case 'sbretry':if(SB)sbLoad();break;
-  case 'payClaim':{const b=d.appts.find(x=>x.id===c.booked);const utr=String(c.utr||'').replace(/\s/g,'');
-    if(utr&&!/^\d{12}$/.test(utr)){c.err={utr:'A UPI reference is 12 digits. Check your UPI app, or leave it blank.'};render();return}
+  case 'payClaim':{const b=d.appts.find(x=>x.id===c.booked);const utr='';
     if(c.sending)return;c.sending=true;c.err={};
     pubManage(b,{action:'paid',utr}).then(({st,j})=>{c.sending=false;if(j&&j.ok){b.claimed=true;toast('Thank you. '+tName(true)+' has been told.')}else toast(st===429?'Too many requests just now. Try again in an hour.':'We could not send that. Try again, or tell '+tName()+' directly.');render()})
     .catch(()=>{c.sending=false;toast('We could not reach the server. Check your connection and try again.');render()});return}

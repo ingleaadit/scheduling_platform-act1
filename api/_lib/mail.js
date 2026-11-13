@@ -33,7 +33,7 @@ function confirmationEmail(b) {
   const online = b.mode !== 'In person';
   const link = online && b.room ? (/^https?:\/\//.test(b.room) ? b.room : 'https://' + b.room) : '';
   const tf = /^your therapist$/i.test(b.therapistName) ? 'Your therapist' : firstName(b.therapistName);
-  const feeText = money(b.fee) + (b.upi ? ', by UPI to ' + b.upi + ' (before or after the session)' : ', by UPI after the session');
+  const feeText = money(b.fee) + ', by UPI after the session';
   const whereText = online ? (link ? 'Online. Video link: ' + link : 'Online. ' + tf + ' will send the video link before the session.') : 'In person' + (b.where ? ', ' + b.where : '');
   const whereHtml = online ? (link ? `Online. <a href="${esc(link)}" style="color:#0A0908">Join the video call</a>` : esc(whereText)) : esc(whereText);
   const policy = b.cancelWindow ? `You can cancel or move this session for free up to ${b.cancelWindow} hours before it starts.${b.latePct ? ` After that, ${b.latePct}% of the fee applies.` : ''}` : '';
