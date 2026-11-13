@@ -41,4 +41,7 @@ function siteUrl() {
   return v.replace(/\/+$/, '');
 }
 
-module.exports = { DAY, str, mins, sha, slotAllowed, ipHash, overLimit, siteUrl };
+// "your therapist" until the therapist has entered a real name (the console's placeholder is "Your name").
+function therapistLabel(profile) { const n = String((profile || {}).name || '').trim(); return !n || n === 'Your name' ? 'your therapist' : n; }
+
+module.exports = { therapistLabel, DAY, str, mins, sha, slotAllowed, ipHash, overLimit, siteUrl };

@@ -32,19 +32,21 @@ function confirmationEmail(b) {
   const when = whenText(b.start, b.tzOff);
   const online = b.mode !== 'In person';
   const link = online && b.room ? (/^https?:\/\//.test(b.room) ? b.room : 'https://' + b.room) : '';
-  const whereText = online ? (link ? 'Online. Video link: ' + link : 'Online. ' + firstName(b.therapistName) + ' will send the video link before the session.') : 'In person' + (b.where ? ', ' + b.where : '');
+  const tf = /^your therapist$/i.test(b.therapistName) ? 'Your therapist' : firstName(b.therapistName);
+  const feeText = money(b.fee) + (b.upi ? ', by UPI to ' + b.upi + ' (before or after the session)' : ', by UPI after the session');
+  const whereText = online ? (link ? 'Online. Video link: ' + link : 'Online. ' + tf + ' will send the video link before the session.') : 'In person' + (b.where ? ', ' + b.where : '');
   const whereHtml = online ? (link ? `Online. <a href="${esc(link)}" style="color:#0A0908">Join the video call</a>` : esc(whereText)) : esc(whereText);
   const policy = b.cancelWindow ? `You can cancel or move this session for free up to ${b.cancelWindow} hours before it starts.${b.latePct ? ` After that, ${b.latePct}% of the fee applies.` : ''}` : '';
   const subject = `Your session with ${b.therapistName} is booked: ${when}`;
   const html = shell(`You’re booked, ${firstName(b.clientName)}`,
     `<p style="margin:0 0 8px;font-size:15px;line-height:1.55">This confirms your session with ${esc(b.therapistName)}.</p>` +
-    rows([['Session', esc(`${b.typeName}, ${b.min} min`)], ['When', esc(when)], ['Where', whereHtml], ['Fee', esc(money(b.fee))]]) +
+    rows([['Session', esc(`${b.typeName}, ${b.min} min`)], ['When', esc(when)], ['Where', whereHtml], ['Fee', esc(feeText)]]) +
     (policy ? `<p style="margin:0 0 12px;font-size:14px;line-height:1.55;color:#5E5850">${esc(policy)}</p>` : '') +
     (b.manageUrl ? `<p style="margin:0 0 16px"><a href="${esc(b.manageUrl)}" style="display:inline-block;background:#0A0908;color:#FFFFFF;text-decoration:none;font-size:15px;padding:11px 18px;border-radius:8px">Reschedule or cancel</a></p><p style="margin:0 0 12px;font-size:13px;line-height:1.55;color:#5E5850">This link is private to you. Anyone who has it can change this booking, so don’t forward this email.</p>`
       : `<p style="margin:0 0 12px;font-size:14px;line-height:1.55;color:#5E5850">To change or cancel, reply to this email.</p>`) +
     `<p style="margin:0;font-size:13px;line-height:1.55;color:#5E5850">In crisis or thinking of harming yourself? Call Tele-MANAS on 14416, free and open all day, every day.</p>`);
   const text = [`You're booked, ${firstName(b.clientName)}.`, '', `This confirms your session with ${b.therapistName}.`, '',
-    `Session: ${b.typeName}, ${b.min} min`, `When: ${when}`, `Where: ${whereText}`, `Fee: ${money(b.fee)}`, '', policy, b.manageUrl ? 'Reschedule or cancel (private link, do not forward): ' + b.manageUrl : 'To change or cancel, reply to this email.', '',
+    `Session: ${b.typeName}, ${b.min} min`, `When: ${when}`, `Where: ${whereText}`, `Fee: ${feeText}`, '', policy, b.manageUrl ? 'Reschedule or cancel (private link, do not forward): ' + b.manageUrl : 'To change or cancel, reply to this email.', '',
     'In crisis or thinking of harming yourself? Call Tele-MANAS on 14416, free and open all day, every day.'].filter((l) => l !== null).join('\n');
   return { subject, html, text };
 }
@@ -81,6 +83,17 @@ function changeEmail(c) {
   return { subject, html, text };
 }
 
+// Sent to the therapist when a client reports a UPI payment. It is a claim, not proof: the therapist checks their bank first.
+function paymentEmail(c) {
+  const subject = `${c.clientName} says they paid ${money(c.fee)}`;
+  const html = shell('Payment reported',
+    `<p style="margin:0 0 8px;font-size:15px;line-height:1.55">${esc(c.clientName)} says they paid ${esc(money(c.fee))} by UPI.</p>` +
+    rows([['Session', esc(whenText(c.start, c.tzOff))], ['UTR', esc(c.utr || 'Not given')]]) +
+    `<p style="margin:0;font-size:14px;line-height:1.55;color:#5E5850">Check your bank, then record the payment in your console.</p>`);
+  const text = [`${c.clientName} says they paid ${money(c.fee)} by UPI.`, '', `Session: ${whenText(c.start, c.tzOff)}`, `UTR: ${c.utr || 'Not given'}`, '', 'Check your bank, then record the payment in your console.'].join('\n');
+  return { subject, html, text };
+}
+
 // Returns 'sent', 'skipped' (no key set) or 'failed'. Never throws.
 async function sendMail({ to, subject, html, text, replyTo }) {
   const key = process.env.RESEND_API_KEY;
@@ -104,4 +117,4 @@ async function sendMail({ to, subject, html, text, replyTo }) {
   }
 }
 
-module.exports = { confirmationEmail, therapistEmail, changeEmail, sendMail, whenText };
+module.exports = { confirmationEmail, therapistEmail, changeEmail, paymentEmail, sendMail, whenText };

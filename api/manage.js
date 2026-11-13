@@ -2,8 +2,8 @@
 // The change is stored for the therapist's console to apply; the console stays the one place that owns the practice data.
 const crypto = require('crypto');
 const { getPool } = require('./_lib/db');
-const { str, sha, slotAllowed, ipHash, overLimit, siteUrl } = require('./_lib/slots');
-const { changeEmail, sendMail } = require('./_lib/mail');
+const { str, sha, slotAllowed, ipHash, overLimit, siteUrl, therapistLabel } = require('./_lib/slots');
+const { changeEmail, paymentEmail, sendMail } = require('./_lib/mail');
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 const REASONS = ['Unwell', 'Work or travel', 'Clinical reason', 'Forgot', 'Other'];
@@ -20,7 +20,7 @@ async function find(client, slug, id, key) {
 function view(row) {
   const s = row.summary || {}, start = new Date(row.starts_at).getTime();
   return { id: 'b' + row.id, name: s.name || '', email: s.email || '', type: s.type, start, dur: s.dur, fee: s.fee, mode: s.mode || 'Online',
-    status: row.cancelled_at ? 'cancelled' : 'upcoming', late: !!(s.cancel && s.cancel.late), lateFee: (s.cancel && s.cancel.lateFee) || 0, reason: (s.cancel && s.cancel.reason) || '' };
+    status: row.cancelled_at ? 'cancelled' : 'upcoming', claimed: !!(s.pay), late: !!(s.cancel && s.cancel.late), lateFee: (s.cancel && s.cancel.lateFee) || 0, reason: (s.cancel && s.cancel.reason) || '' };
 }
 
 module.exports = async (req, res) => {
@@ -58,6 +58,16 @@ module.exports = async (req, res) => {
       await client.query('commit');
       row.cancelled_at = new Date(); row.summary = Object.assign({}, sum, { cancel: { late, lateFee, reason } });
       mailInfo = { kind: 'cancelled', start: oldStart, lateFee };
+    } else if (src.action === 'paid') {
+      // The client says they paid by UPI. This only tells the therapist; the therapist records the payment after checking their bank.
+      const utr = str(src.utr, 20).replace(/\s/g, '');
+      if (utr && !/^\d{12}$/.test(utr)) { await client.query('rollback'); return res.status(400).json({ ok: false, error: 'utr' }); }
+      await client.query("update public.booking_inbox set summary = summary || $2::jsonb where id = $1", [row.id, JSON.stringify({ pay: { utr, at: now } })]);
+      await client.query("insert into public.booking_inbox (practitioner_id, kind, booking_id, payload, ip_hash) values ($1, 'payment', $2, $3, $4)",
+        [pid, row.id, JSON.stringify({ id: 'p' + crypto.randomUUID(), apptId, utr, at: now }), ipHash(req, pid)]);
+      await client.query('commit');
+      row.summary = Object.assign({}, sum, { pay: { utr, at: now } });
+      mailInfo = { kind: 'paid', start: oldStart, utr, fee: sum.fee };
     } else if (src.action === 'reschedule') {
       const start = Number(src.start), dur = Number(sum.dur) || ty.min, end = start + dur * 60000;
       if (late) { await client.query('rollback'); return res.status(409).json({ ok: false, error: 'late' }); }
@@ -87,10 +97,14 @@ module.exports = async (req, res) => {
     try {
       const t = await client.query('select email from auth.users where id = $1', [pid]);
       const therapistAddr = t.rows.length ? t.rows[0].email : '';
-      const base = Object.assign({ clientName: sum.name || 'A client', therapistName: (data.profile || {}).name || 'your therapist', typeName: ty.name, min: Number(sum.dur) || ty.min, tzOff: data.tzOff,
+      const base = Object.assign({ clientName: sum.name || 'A client', therapistName: therapistLabel(data.profile), typeName: ty.name, min: Number(sum.dur) || ty.min, tzOff: data.tzOff,
         manageUrl: siteUrl() ? `${siteUrl()}/?t=${slug}&b=${row.id}&k=${key}` : '' }, mailInfo);
-      mail = await sendMail(Object.assign({ to: sum.email, replyTo: therapistAddr }, changeEmail(base)));
-      await sendMail(Object.assign({ to: therapistAddr }, changeEmail(Object.assign({ forTherapist: true }, base))));
+      if (mailInfo.kind === 'paid') {
+        await sendMail(Object.assign({ to: therapistAddr }, paymentEmail(base)));
+      } else {
+        mail = await sendMail(Object.assign({ to: sum.email, replyTo: therapistAddr }, changeEmail(base)));
+        await sendMail(Object.assign({ to: therapistAddr }, changeEmail(Object.assign({ forTherapist: true }, base))));
+      }
     } catch (e) { console.error('manage mail step failed', e.code || e.name); mail = 'failed'; }
 
     return res.status(200).json({ ok: true, booking: view(row), mail });

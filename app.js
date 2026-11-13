@@ -98,7 +98,19 @@ const fakeUtr=n=>'6'+String((n*7919+31337)*104729%1e11).padStart(11,'0');
 const payLink=a=>'practice.example/pay/'+a.id;
 const checkLink=a=>'practice.example/c/'+a.id;
 function payText(a){const amt=due(a)||a.fee;return `Hi ${firstName(a.name)}, ${a.status==='held'?'thank you for the session on '+fD(a.start)+'. The fee is '+money(amt):'the late cancellation fee for '+fD(a.start)+' is '+money(amt)}. You can pay by UPI here: https://${payLink(a)}\nOr pay to UPI ID ${D().settings.upi}.`}
-function newClient(){return {step:'intro',mode:'Online',type:'first',day:null,slot:null,d:{fn:'',ln:'',email:'',wa:'',hp:''},a:{},g:{name:'',rel:'',wa:''},agree:false,err:{},booked:null,resched:null,cancelAsk:false,cancelReason:'',wl:{fn:'',ln:'',wa:'',days:'Weekdays',times:'Evenings after 6',type:'first'},wlDone:false}}
+/* Therapist's first name, or "your therapist" until they have entered a real name (the placeholder is "Your name"). */
+function tName(cap){const n=String((P()||{}).name||'').trim();return !n||n==='Your name'?(cap?'Your therapist':'your therapist'):firstName(n)}
+/* Returning clients ("Follow-up session") are not asked the first-session questions again. */
+const needIntake=()=>S.c.type!=='follow';
+const stepKeys=()=>needIntake()?['time','details','about','confirm']:['time','details','confirm'];
+const stepNo=st=>stepKeys().indexOf(st)+1;
+const stepLabel={time:'Pick a time',details:'Your details',about:'About you',confirm:'Confirm'};
+/* Remember me: first name, last name, email and phone stay on the client's own device only, and only if they ask. Never the intake answers. */
+const ME_KEY='practice-client-me-v1';
+function meLoad(){try{const v=JSON.parse(localStorage.getItem(ME_KEY)||'null');return v&&typeof v==='object'?v:null}catch(e){return null}}
+function meSave(d){try{localStorage.setItem(ME_KEY,JSON.stringify({fn:d.fn,ln:d.ln,email:d.email,wa:d.wa}))}catch(e){}}
+function meClear(){try{localStorage.removeItem(ME_KEY)}catch(e){}}
+function newClient(){const me=LIVE==='client'&&SLUG?meLoad():null;return {remember:!!me,fromMe:!!me,step:'intro',mode:'Online',type:'first',day:null,slot:null,d:{fn:me?String(me.fn||''):'',ln:me?String(me.ln||''):'',email:me?String(me.email||''):'',wa:me?String(me.wa||''):'',hp:''},a:{},g:{name:'',rel:'',wa:''},agree:false,err:{},booked:null,resched:null,cancelAsk:false,cancelReason:'',wl:{fn:'',ln:'',wa:'',days:'Weekdays',times:'Evenings after 6',type:'first'},wlDone:false}}
 function fresh(){return {view:'client',device:'desktop',c:newClient(),t:{tab:'schedule',apFilter:'upcoming',hide:false,freed:null,period:90,blk:{date:'',from:'17:00',to:'18:00',note:''},sv:{date:'',hours:'1',sup:'',kind:'Individual',note:''},svc:{},wadd:{name:'',wa:'',pref:''}},modal:null,data:ensure(seed()),auth:false,login:newLogin()}}
 function newLogin(){return {mode:'email',email:'',pw:'',pw2:'',phone:'',otp:'',sent:false,err:'',note:'',busy:false}}
 const DEMO_EMAIL='demo@practice.test',DEMO_PW='Practice2026',DEMO_OTP='123456';
@@ -182,7 +194,7 @@ function sbLoad(){
 function sbQueue(){if(!SB||!S.auth||!S.dbReady)return;S.dirty=true;clearTimeout(sbT);sbT=setTimeout(sbFlush,1200)}
 /* What the booking page may show: no client names, only the times that are taken. */
 function pubData(){const d=S.data,s=d.settings;return {profile:d.profile,types:d.types,hours:d.hours,blocks:d.blocks,intake:d.intake,consent:d.consent,
-  settings:{cancelWindow:s.cancelWindow,latePct:s.latePct,minors:s.minors,gapL:s.gapL,checkin:s.checkin,videoMode:s.videoMode,room:s.room},
+  settings:{cancelWindow:s.cancelWindow,latePct:s.latePct,minors:s.minors,gapL:s.gapL,checkin:s.checkin,videoMode:s.videoMode,room:s.room,upi:s.upi},
   busy:d.appts.filter(a=>a.status==='upcoming'&&a.start+a.dur*6e4>Date.now()).map(a=>[a.start,a.start+a.dur*6e4]),tzOff:new Date().getTimezoneOffset()}}
 /* The link's name. It is fixed once the therapist has entered their own name, so shared links keep working. */
 function sbSlug(){const s=S.data.settings;if(s.slug)return s.slug;const named=P().name&&P().name!=='Your name';
@@ -203,7 +215,8 @@ function sbInbox(){if(!SB||!S.auth||!S.dbReady||document.hidden)return Promise.r
   return SB.from('booking_inbox').select('id,kind,payload').is('imported_at',null).order('created_at').then(({data,error})=>{if(error||!data||!data.length)return;
     let n=0;S.inbox=S.inbox||[];
     data.forEach(r=>{const p=r.payload||{};if(!p.id)return;
-      if(r.kind==='cancel'||r.kind==='reschedule'){const x=S.data.appts.find(a=>a.id===p.apptId);
+      if(r.kind==='payment'){const x=S.data.appts.find(a=>a.id===p.apptId);if(x&&!x.paid){x.payClaim={utr:p.utr||'',at:p.at};n++}}
+      else if(r.kind==='cancel'||r.kind==='reschedule'){const x=S.data.appts.find(a=>a.id===p.apptId);
         /* A change the client made from their private link. Only a session that is still upcoming can be changed. */
         if(x&&x.status==='upcoming'){if(r.kind==='cancel'){cancelAppt(x,p.reason||'Other',p.at);x.cancelledBy='client';n++}else if(x.start!==p.start){x.start=p.start;x.reminded=false;x.movedAt=p.at;x.isNew=true;n++}}}
       else{const list=r.kind==='waitlist'?S.data.waitlist:S.data.appts;if(!list.some(x=>x.id===p.id)){list.push(p);n++}}
@@ -300,7 +313,7 @@ function summary(withBtn){const c=S.c,ty=typeOf(c.type);return `<aside class="su
   <div class="ln"><span class="muted">When</span><span style="text-align:right">${c.slot?esc(fDL(c.slot))+'<br>'+fT(c.slot):'Pick a time'}</span></div>
   <div class="ln"><span class="muted">Fee</span><b>${money(ty.fee)}</b></div>
   <p class="muted" style="margin:0;font-size:13px;line-height:1.45">Free to cancel or move up to ${D().settings.cancelWindow} hours before.</p>${withBtn||''}</aside>`}
-function nextBtn(){const st=S.c.step;if(st==='time')return {label:S.c.resched?'Move to this time':'Continue',act:'toDetails',dis:!S.c.slot};if(st==='details')return {label:'Continue',act:'toAbout'};if(st==='about')return {label:'Continue',act:'toConfirm'};if(st==='confirm')return {label:'Confirm appointment',act:'book'};return null}
+function nextBtn(){const st=S.c.step;if(st==='details'&&!needIntake())return {label:'Continue',act:'toAbout'};if(st==='time')return {label:S.c.resched?'Move to this time':'Continue',act:'toDetails',dis:!S.c.slot};if(st==='details')return {label:'Continue',act:'toAbout'};if(st==='about')return {label:'Continue',act:'toConfirm'};if(st==='confirm')return {label:'Confirm appointment',act:'book'};return null}
 
 function vIntro(m){const p=P();return `${m?'':''}<div class="${m?'mbody':'cwrap'}" style="${m?'':'gap:44px'}">
   <section class="hero"><div class="sec" style="gap:16px">
@@ -334,7 +347,8 @@ function vTime(){const c=S.c,ty=typeOf(c.type),ds=days();
 
 function vDetails(){const e=S.c.err;return `${SLUG?'<div aria-hidden="true" style="position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden"><label>Website<input type="text" tabindex="-1" autocomplete="off" data-f="c.d.hp" value=""></label></div>':''}<div class="grid2">${field('fn','First name','c.d.fn',{err:e.fn,ac:'given-name'})}${field('ln','Last name','c.d.ln',{err:e.ln,ac:'family-name'})}</div>
   ${field('em','Email','c.d.email',{type:'email',err:e.email,ph:'name@example.com',ac:'email',hint:'For your booking details. Nothing else.'})}
-  ${field('wa','WhatsApp number','c.d.wa',{type:'tel',mode:'numeric',err:e.wa,pre:'+91',ph:'98765 43210',ac:'tel-national',hint:'Reminders come here, worded so nobody else can tell what they are for.'})}`}
+  ${field('wa','WhatsApp number','c.d.wa',{type:'tel',mode:'numeric',err:e.wa,pre:'+91',ph:'98765 43210',ac:'tel-national',hint:'Reminders come here, worded so nobody else can tell what they are for.'})}
+  ${SLUG?`<label class="check" for="remember"><input type="checkbox" id="remember" data-f="c.remember" ${S.c.remember?'checked':''}><span>Remember my name, email and number on this device, so I don’t have to type them again. <span class="muted">Not your answers to the questions. Don’t tick this on a shared phone or computer.</span></span></label>${S.c.fromMe?`<p class="muted" style="margin:0;font-size:14px">Filled in from this device. <button type="button" class="linkbtn" style="padding:0;font-size:14px" data-a="forgetMe">Not you? Clear</button></p>`:''}`:''}`}
 
 function vAbout(){const e=S.c.err,s=D().settings;let out='';
   D().intake.forEach(q=>{const path='c.a.'+q.id;if(getPath(path)==null)setPath(path,'');
@@ -356,14 +370,25 @@ function vBooked(){const a=D().appts.find(x=>x.id===S.c.booked);if(!a)return '<p
   const lateNow=a.start-Date.now()<s.cancelWindow*36e5;
   if(a.status==='cancelled')return `<div class="sec" style="max-width:640px"><h1 style="font-size:34px">Session cancelled</h1><p class="muted" style="margin:0;font-size:17px;line-height:1.5">${esc(fDL(a.start))}, ${fT(a.start)} is cancelled. ${a.lateFee?`A late cancellation fee of ${money(a.lateFee)} applies, as in the policy.`:'No fee applies.'}</p><div><button class="btn" data-a="startBook">Book another time</button></div></div>`;
   return `<div class="sec" style="max-width:680px;gap:18px"><span class="av" style="width:56px;height:56px;font-size:26px">✓</span><h1 style="font-size:${S.device==='phone'?'32px':'40px'}">You’re booked, ${esc(firstName(a.name))}</h1>
-  <p class="muted" style="margin:0;font-size:17px;line-height:1.5">${SLUG?(a.mail==='sent'?`A confirmation email is on its way to ${esc(a.email)}. It has a private link to move or cancel this session.`:`${esc(firstName(P().name))} has your booking and will be in touch to confirm.`):`${esc(firstName(P().name))} will confirm on WhatsApp and send a reminder the day before.`}${a.guardian?' She will also contact your parent or guardian for consent.':''}</p>
-  <div class="card"><dl class="kv"><dt>Session</dt><dd>${esc(ty.name)}, ${ty.min} min</dd><dt>When</dt><dd>${esc(fDL(a.start))}, ${fT(a.start)}</dd><dt>Where</dt><dd>${videoFor(a)?`Online. Video link: <a href="https://${videoFor(a)}" target="_blank" rel="noopener">${esc(videoFor(a))}</a>`:SLUG&&a.mode!=='In person'?`Online. ${esc(firstName(P().name))} will send the video link before the session.`:esc(P().where.replace(/^Online, and in person in /,''))}</dd><dt>Fee</dt><dd>${money(a.fee)}, by UPI after the session.${SLUG?'':' A payment link comes on WhatsApp.'}</dd>${a.wa?`<dt>WhatsApp</dt><dd>${esc(a.wa)}</dd>`:''}</dl></div>
-  ${SLUG&&!(S.mg||{})[a.id]?`<p class="muted" style="margin:0;font-size:14px">To change or cancel, ${a.mail==='sent'?'reply to the confirmation email':'contact '+esc(firstName(P().name))}. It is free until ${esc(fD(a.start-s.cancelWindow*36e5))}, ${fT(a.start-s.cancelWindow*36e5)}.</p>`:c.cancelAsk?`<div class="panel sec"><b>Cancel this session?</b>${lateNow?`<div class="note warn">It starts in less than ${s.cancelWindow} hours, so a fee of ${money(Math.round(a.fee*s.latePct/100))} applies.</div>`:'<span class="muted">No fee applies.</span>'}
+  <p class="muted" style="margin:0;font-size:17px;line-height:1.5">${SLUG?(a.mail==='sent'?`A confirmation email is on its way to ${esc(a.email)}. It has a private link to move or cancel this session.`:`${esc(tName(true))} has your booking and will be in touch to confirm.`):`${esc(firstName(P().name))} will confirm on WhatsApp and send a reminder the day before.`}${a.guardian?' She will also contact your parent or guardian for consent.':''}</p>
+  <div class="card"><dl class="kv"><dt>Session</dt><dd>${esc(ty.name)}, ${ty.min} min</dd><dt>When</dt><dd>${esc(fDL(a.start))}, ${fT(a.start)}</dd><dt>Where</dt><dd>${videoFor(a)?`Online. Video link: <a href="https://${videoFor(a)}" target="_blank" rel="noopener">${esc(videoFor(a))}</a>`:SLUG&&a.mode!=='In person'?`Online. ${esc(tName(true))} will send the video link before the session.`:esc(P().where.replace(/^Online, and in person in /,''))}</dd><dt>Fee</dt><dd>${money(a.fee)}${SLUG&&s.upi?'. You can pay now (below) or after the session.':', by UPI after the session.'}${SLUG?'':' A payment link comes on WhatsApp.'}</dd>${a.wa?`<dt>WhatsApp</dt><dd>${esc(a.wa)}</dd>`:''}</dl></div>
+  ${SLUG&&s.upi&&a.status==='upcoming'?payBox(a,s):''}
+  ${SLUG&&!(S.mg||{})[a.id]?`<p class="muted" style="margin:0;font-size:14px">To change or cancel, ${a.mail==='sent'?'reply to the confirmation email':'contact '+esc(tName())}. It is free until ${esc(fD(a.start-s.cancelWindow*36e5))}, ${fT(a.start-s.cancelWindow*36e5)}.</p>`:c.cancelAsk?`<div class="panel sec"><b>Cancel this session?</b>${lateNow?`<div class="note warn">It starts in less than ${s.cancelWindow} hours, so a fee of ${money(Math.round(a.fee*s.latePct/100))} applies.</div>`:'<span class="muted">No fee applies.</span>'}
     ${chips('c.cancelReason',REASONS,'Reason, optional')}<div style="display:flex;gap:10px;flex-wrap:wrap"><button class="btn" data-a="clientCancel">Cancel session</button><button class="btn2" data-a="set" data-k="c.cancelAsk" data-v="">Keep it</button></div></div>`
   :`<div style="display:flex;gap:10px;flex-wrap:wrap">${SLUG&&lateNow?'':'<button class="btn2" data-a="resched">Reschedule</button>'}<button class="btn2" data-a="set" data-k="c.cancelAsk" data-v="1">Cancel</button></div>
     <p class="muted" style="margin:0;font-size:13px">Free to cancel or move until ${esc(fD(a.start-s.cancelWindow*36e5))}, ${fT(a.start-s.cancelWindow*36e5)}.</p>`}
   ${LIVE?'':'<p class="muted" style="margin:0;font-size:13px">Switch to the Therapist window to see this booking arrive.</p>'}</div>`}
 
+/* Pay by UPI straight to the therapist. There is no payment company in between: the client pays from their own UPI app, then can enter the 12-digit reference (UTR) so the therapist can match it. */
+function payBox(a,s){if(a.claimed)return `<div class="note"><b>Thank you.</b><br>${esc(tName(true))} will mark this paid once it shows in their account.</div>`;
+  const link='upi://pay?pa='+encodeURIComponent(s.upi)+'&pn='+encodeURIComponent(P().name&&P().name!=='Your name'?P().name:'Therapist')+'&am='+encodeURIComponent(a.fee)+'&cu=INR&tn='+encodeURIComponent('Session '+fD(a.start));
+  const e=S.c.err||{};
+  return `<div class="card sec" style="gap:12px;max-width:680px"><b style="font-size:17px">Pay ${money(a.fee)} now by UPI</b>
+    <span class="muted" style="font-size:14px;line-height:1.5">Optional. You can also pay after the session. The money goes straight to ${esc(tName())}.</span>
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><code id="upiid" style="font-size:16px;word-break:break-all">${esc(s.upi)}</code><button type="button" class="mini" data-a="copy" data-src="upiid">Copy UPI ID</button></div>
+    <div><a class="btn" href="${esc(link)}" style="text-decoration:none;display:inline-flex;align-items:center">Open my UPI app</a></div>
+    <span class="muted" style="font-size:13px;line-height:1.5">On a phone this opens your UPI app with the amount filled in. On a computer, copy the UPI ID and pay from your phone.</span>
+    ${(S.mg||{})[a.id]?`<div class="sec" style="gap:8px">${field('utr','After paying: UPI reference (UTR), optional','c.utr',{req:false,mode:'numeric',ph:'12 digits',err:e.utr,hint:'In your UPI app under the payment details. It helps '+tName()+' match your payment.'})}<div><button type="button" class="btn2" data-a="payClaim">I have paid</button></div></div>`:''}</div>`}
 function vWaitlist(){const w=S.c.wl,e=S.c.err;if(S.c.wlDone)return `<div class="sec" style="max-width:620px"><span class="av" style="width:56px;height:56px;font-size:26px">✓</span><h1 style="font-size:34px">You’re on the waitlist</h1><p class="muted" style="margin:0;font-size:17px;line-height:1.5">When a ${esc(w.days.toLowerCase())} slot in the ${esc(w.times.toLowerCase())} opens, you’ll get a WhatsApp message. Reply STOP at any time to leave.</p><div><button class="btn2" data-a="go" data-v="intro">Back to ${esc(firstName(P().name))}’s page</button></div></div>`;
   return `<div class="sec" style="gap:18px;max-width:680px"><p class="muted" style="margin:0;font-size:17px;line-height:1.5">When a session frees up at a time that suits you, you get a WhatsApp message with the time. Take it or let it pass.</p>
   <div class="grid2">${field('wfn','First name','c.wl.fn',{err:e.fn})}${field('wln','Last name','c.wl.ln',{err:e.ln})}</div>
@@ -373,10 +398,10 @@ function vWaitlist(){const w=S.c.wl,e=S.c.err;if(S.c.wlDone)return `<div class="
   ${chips('c.wl.type',D().types.map(t=>t.id),'Session').replace(/>(first|follow|reduced)</g,(m0,id)=>'>'+esc(typeOf(id).name)+'<')}
   <p class="muted" style="margin:0;font-size:13px">Offers go out in the order people joined.</p></div>`}
 
-function doneRows(){const c=S.c,n=STEP_N[c.step],ty=typeOf(c.type),rows=[];if(c.resched)return '';
+function doneRows(){const c=S.c,n=stepNo(c.step),ty=typeOf(c.type),rows=[];if(c.resched)return '';
   if(n>1&&c.slot)rows.push(['time','Time',`${esc(ty.name)} · ${esc(fD(c.slot))}, ${fT(c.slot)}`]);
   if(n>2)rows.push(['details','Your details',`${esc(c.d.fn+' '+c.d.ln)} · +91 ${esc(c.d.wa)}`]);
-  if(n>3)rows.push(['about','About you','Answered']);
+  if(n>3&&needIntake())rows.push(['about','About you','Answered']);
   return rows.length?`<div class="donerows">${rows.map(([k,l,v])=>`<div class="donerow"><span><small>${l}</small><b>${v}</b></span><button type="button" class="linkbtn" style="padding:0 4px;min-height:44px" data-a="go" data-v="${k}">Change</button></div>`).join('')}</div>`:''}
 const TITLES={time:'Pick a time',details:'Your details',about:'Client information',confirm:'Confirm your booking',booked:'Booked',waitlist:'Join the waitlist'};
 function clientDesk(){const c=S.c,st=c.step;
@@ -384,8 +409,8 @@ function clientDesk(){const c=S.c,st=c.step;
   let body='';
   if(st==='intro')body=vIntro(false);
   else if(st==='booked'||st==='waitlist'){body=`<div class="cwrap">${st==='waitlist'&&!c.wlDone?`<button class="linkbtn" style="align-self:flex-start;padding:0" data-a="back">← Back to times</button><h1 style="font-size:40px">Join ${esc(firstName(P().name))}’s waitlist</h1>`:''}${st==='booked'?vBooked():vWaitlist()}${st==='waitlist'&&!c.wlDone?'<div><button class="btn" data-a="joinWl">Join the waitlist</button></div>':''}</div>`}
-  else{const n=STEP_N[st],nb=nextBtn();const content=st==='time'?vTime():st==='details'?vDetails():st==='about'?vAbout():vConfirm();
-    body=`<div class="cwrap"><div class="steps" aria-label="Progress">${['Pick a time','Your details','About you','Confirm'].map((l,i)=>`<span class="${i+1===n?'on':i+1<n?'past':''}" ${i+1===n?'aria-current="step"':''}>${i+1} · ${l}</span>`).join('')}</div>
+  else{const n=stepNo(st),nb=nextBtn();const content=st==='time'?vTime():st==='details'?vDetails():st==='about'?vAbout():vConfirm();
+    body=`<div class="cwrap"><div class="steps" aria-label="Progress">${stepKeys().map(k=>stepLabel[k]).map((l,i)=>`<span class="${i+1===n?'on':i+1<n?'past':''}" ${i+1===n?'aria-current="step"':''}>${i+1} · ${l}</span>`).join('')}</div>
     <div class="split"><form class="sec" style="gap:20px" data-form="${st}" novalidate><button type="button" class="linkbtn" style="align-self:flex-start;padding:0" data-a="back">← Back</button>${doneRows()}<h1 style="font-size:40px;font-weight:700">${c.resched&&st==='time'?'Pick a new time':TITLES[st]}</h1>${content}
     <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap"><button type="button" class="btn" data-a="${nb.act}" ${nb.dis?'disabled':''}>${nb.label}</button>${st==='time'&&!c.slot?'<span class="muted" style="font-size:14px">Choose a time to continue</span>':''}</div></form>${summary()}</div></div>`}
   return nav+body+`<footer class="cfoot">${crisis()}</footer>`}
@@ -393,10 +418,10 @@ function clientDesk(){const c=S.c,st=c.step;
 function clientPhone(){const c=S.c,st=c.step;
   if(st==='intro')return `<header class="mtop"><span></span><b>${esc(P().name)}</b><span></span></header><div class="scr">${vIntro(true)}</div><div class="mbar"><button class="btn2" data-a="go" data-v="waitlist" style="height:50px;padding:0 16px">Waitlist</button><button class="btn" data-a="startBook" style="flex:1;height:50px">Book a session</button></div>`;
   if(st==='booked'||st==='waitlist'){const wl=st==='waitlist'&&!c.wlDone;return `<header class="mtop"><button data-a="${wl?'back':'go'}" data-v="intro" aria-label="Back">←</button><b>${wl?'Waitlist':esc(P().name)}</b><span></span></header><div class="scr"><div class="mbody">${wl?`<h1 style="font-size:30px">Join ${esc(firstName(P().name))}’s waitlist</h1>`:''}${st==='booked'?vBooked():vWaitlist()}</div></div>${wl?'<div class="mbar"><button class="btn full" data-a="joinWl" style="height:50px">Join the waitlist</button></div>':''}`}
-  const n=STEP_N[st],nb=nextBtn();const content=st==='time'?vTime():st==='details'?vDetails():st==='about'?vAbout():vConfirm();
-  const ty=typeOf(c.type);
-  return `<header class="mtop"><button data-a="back" aria-label="Back">←</button><b>Book a session</b><span></span></header><div class="prog" aria-label="Step ${n} of 4">${[1,2,3,4].map(i=>`<i class="${i<=n?'on':''}"></i>`).join('')}</div>
-  <div class="scr"><form class="mbody" data-form="${st}" novalidate>${doneRows()}<div><p class="muted" style="margin:0 0 4px;font-size:13px">Step ${n} of 4</p><h1 style="font-size:30px;font-weight:700">${c.resched&&st==='time'?'Pick a new time':TITLES[st]}</h1></div>${content}</form></div>
+  const n=stepNo(st),nb=nextBtn();const content=st==='time'?vTime():st==='details'?vDetails():st==='about'?vAbout():vConfirm();
+  const ty=typeOf(c.type);const NS=stepKeys().length;
+  return `<header class="mtop"><button data-a="back" aria-label="Back">←</button><b>Book a session</b><span></span></header><div class="prog" aria-label="Step ${n} of ${NS}">${stepKeys().map((k,j)=>j+1).map(i=>`<i class="${i<=n?'on':''}"></i>`).join('')}</div>
+  <div class="scr"><form class="mbody" data-form="${st}" novalidate>${doneRows()}<div><p class="muted" style="margin:0 0 4px;font-size:13px">Step ${n} of ${NS}</p><h1 style="font-size:30px;font-weight:700">${c.resched&&st==='time'?'Pick a new time':TITLES[st]}</h1></div>${content}</form></div>
   <div class="mbar"><span>${c.slot?`<b style="font-size:15px">${esc(fD(c.slot))}, ${fT(c.slot)}</b><br><span class="muted">${esc(ty.name)} · ${money(ty.fee)}</span>`:`<span class="muted">${esc(ty.name)} · ${money(ty.fee)}</span>`}</span><button class="btn" data-a="${nb.act}" ${nb.dis?'disabled':''} style="height:50px;padding:0 20px">${st==='confirm'?'Confirm':nb.label}</button></div>`}
 
 /* client validation */
@@ -554,7 +579,7 @@ function tLog(){const s=D().settings;const y0=new Date(new Date().getFullYear(),
 
 function remText(a){const v=videoFor(a);return `Hi ${firstName(a.name)}, a reminder of your session with ${firstName(P().name)} tomorrow, ${fD(a.start)} at ${fT(a.start)}. Reply here if you need to change it.`+(v?`\nJoin here: https://${v}`:`\nAddress: ${P().where.replace(/^Online, and in person in /,'')}`)+(D().settings.checkin?`\nBefore we meet, a one-minute check-in: https://${checkLink(a)}`:'')}
 function tMessages(){const tm=T0+DAY;const due1=D().appts.filter(a=>a.status==='upcoming'&&dayStart(a.start)===tm);const newB=D().appts.filter(a=>a.isNew&&a.status==='upcoming');
-  const open=nextFree('follow',5);const openTxt='Hi! Open times this week with '+firstName(P().name)+':\n'+open.map(s=>'• '+fD(s)+', '+fT(s)).join('\n')+'\nReply with the one you want.';
+  const open=nextFree('follow',5);const openTxt='Hi! Open times this week with '+tName()+':\n'+open.map(s=>'• '+fD(s)+', '+fT(s)).join('\n')+'\nReply with the one you want.';
   return `<div class="ttl"><div><h1>Messages</h1><p>Ready-to-send WhatsApp messages. Reminders never mention therapy.</p></div></div>
   <section class="panel sec"><h2 class="h2">Reminders for tomorrow · ${due1.length}</h2>${autoNote()}${due1.length?due1.map(a=>`<div class="sec" style="gap:8px;padding:12px 0;border-top:1px solid var(--line)"><div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap"><b>${esc(nm(a.name))} · ${fT(a.start)}</b>${a.reminded?'<span class="pill ok">Sent</span>':''}</div><div class="msg" id="rm_${a.id}">${esc(remText(a))}</div><span class="acts"><a class="mini pri" href="https://wa.me/?text=${encodeURIComponent(remText(a))}" target="_blank" rel="noopener">Open in WhatsApp</a><button class="mini w" data-a="copy" data-src="rm_${a.id}">Copy</button><button class="mini w" data-a="reminded" data-id="${a.id}">${a.reminded?'Mark not sent':'Mark sent'}</button></span></div>`).join(''):'<p class="muted" style="margin:0">No sessions tomorrow.</p>'}</section>
   ${newB.length?`<section class="panel sec"><h2 class="h2">Confirm new bookings · ${newB.length}</h2>${newB.map(a=>{const t=`Hi ${firstName(a.name)}, this is ${firstName(P().name)}. Your session on ${fD(a.start)} at ${fT(a.start)} is confirmed.${videoFor(a)?' Join here: https://'+videoFor(a):' See you at '+P().where.replace(/^Online, and in person in /,'')+'.'}`;return `<div class="sec" style="gap:8px;padding:12px 0;border-top:1px solid var(--line)"><b>${esc(nm(a.name))} · ${esc(fD(a.start))}, ${fT(a.start)}</b><div class="msg" id="cf_${a.id}">${esc(t)}</div><span class="acts"><a class="mini pri" href="https://wa.me/?text=${encodeURIComponent(t)}" target="_blank" rel="noopener">Open in WhatsApp</a><button class="mini w" data-a="copy" data-src="cf_${a.id}">Copy</button><button class="mini w" data-a="confirmed" data-id="${a.id}">Mark confirmed</button></span></div>`}).join('')}</section>`:''}
@@ -743,6 +768,7 @@ function renderModal(){const m=S.modal,s=D().settings;
     ${a.sup&&!a.supDone?field('supn','What to discuss','data.appts.'+D().appts.indexOf(a)+'.supNote',{type:'long',req:false,ph:'The question you want to bring',hint:'Only you see this. The supervision list shows initials, never full names.'}):''}</div><dl class="kv"><dt>WhatsApp</dt><dd>${esc(S.t.hide?'Hidden':a.wa)}</dd><dt>Email</dt><dd>${esc(S.t.hide?'Hidden':a.email)}</dd><dt>Where</dt><dd>${videoFor(a)?`Online · <a href="https://${videoFor(a)}" target="_blank" rel="noopener">${esc(videoFor(a))}</a>`:'In person'}</dd>
     ${a.checkin?`<dt>Check-in</dt><dd>${m.show?`${a.checkin.score} of 5 · “${esc(a.checkin.note)}”`:`<button class="linkbtn" style="padding:0" data-a="set" data-k="modal.show" data-v="1">🔒 Show answer</button>`}</dd>`:a.status==='upcoming'&&D().settings.checkin?'<dt>Check-in</dt><dd class="muted">Goes out with the reminder</dd>':''}
     ${a.paid?`<dt>Payment</dt><dd>${a.pay?`${esc(a.pay.method)}${a.pay.utr?' · UTR '+esc(a.pay.utr):''} · ${esc(fD(a.pay.at))}`:'No details recorded'} <button class="linkbtn" style="padding:0;font-size:13px" data-a="payEdit" data-id="${a.id}">${a.pay&&a.pay.utr?'Edit':'Add UTR'}</button></dd>`:''}
+    ${!a.paid&&a.payClaim?`<dt>Payment</dt><dd>Client says they paid${a.payClaim.utr?' · UTR '+esc(a.payClaim.utr):''}. Check your bank, then <button class="linkbtn" style="padding:0;font-size:13px" data-a="apPaid" data-id="${a.id}">Record payment</button></dd>`:''}
     <dt>Booked</dt><dd>${esc(a.source)}</dd>${D().connect.gcal.on&&D().connect.gcal.write&&a.status==='upcoming'?`<dt>Google Calendar</dt><dd>“Session · ${esc(D().connect.gcal.initials?initials(a.name):a.name)}” in ${esc(D().connect.gcal.cal)}</dd>`:''}</dl>${g}${acts}${intake}`)}
   if(m.kind==='offer'){const w=D().waitlist.find(x=>x.id===m.id);if(!w)return '';const sl=m.slot?[Number(m.slot)]:nextFree(w.type,12).filter(t=>wlMatches(w,t)).slice(0,3);const list=sl.length?sl:nextFree(w.type,3);
     const t=`Hi ${firstName(w.name)}, this is ${firstName(P().name)}. A time has opened up: ${list.map(x=>fD(x)+' at '+fT(x)).join(', or ')}. Reply to take it, or let it pass and you stay on the list.`;
@@ -804,12 +830,18 @@ function act(a,el){const ds=el.dataset,c=S.c,d=D();if(a!=='calMenu')S.t.calMenu=
   case 'view':S.view=ds.v;S.modal=null;setHash();break;
   case 'device':S.device=ds.v;S.modal=null;if(ds.v==='desktop'&&S.t.tab==='more')S.t.tab='schedule';setHash();break;
   case 'sbretry':if(SB)sbLoad();break;
+  case 'payClaim':{const b=d.appts.find(x=>x.id===c.booked);const utr=String(c.utr||'').replace(/\s/g,'');
+    if(utr&&!/^\d{12}$/.test(utr)){c.err={utr:'A UPI reference is 12 digits. Check your UPI app, or leave it blank.'};render();return}
+    if(c.sending)return;c.sending=true;c.err={};
+    pubManage(b,{action:'paid',utr}).then(({st,j})=>{c.sending=false;if(j&&j.ok){b.claimed=true;toast('Thank you. '+tName(true)+' has been told.')}else toast(st===429?'Too many requests just now. Try again in an hour.':'We could not send that. Try again, or tell '+tName()+' directly.');render()})
+    .catch(()=>{c.sending=false;toast('We could not reach the server. Check your connection and try again.');render()});return}
+  case 'forgetMe':meClear();c.d={fn:'',ln:'',email:'',wa:'',hp:''};c.fromMe=false;c.remember=false;break;
   case 'pubretry':if(SLUG)pubLoad();break;
   case 'reset':if(SB)break;S=Object.assign(fresh(),{view:S.view,device:S.device});save();toast('Demo reset to example data');break;
   case 'set':{let v=ds.v;const cur=getPath(ds.k);if(ds.k==='c.cancelReason'||ds.k==='modal.reason'){if(cur===v)v=''}setPath(ds.k,v==='' && (ds.k==='c.cancelAsk'||ds.k==='modal.cancel'||ds.k==='modal.show')?false:v);if(ds.k.startsWith('c.a.'))delete c.err[ds.k.slice(4)];break}
   case 'go':if(ds.v==='waitlist'){c.wlFrom=c.step;c.wlDone=false}go(ds.v);if(ds.v==='intro'){c.resched=null;c.wlDone=false}break;
   case 'startBook':if(c.step==='booked'&&c.booked){const b=d.appts.find(x=>x.id===c.booked);if(b&&b.status==='cancelled'){S.c=newClient();}}S.c.type=ds.v||S.c.type||'first';S.c.slot=null;S.c.day=null;go('time');break;
-  case 'back':{const m={time:'intro',details:'time',about:'details',confirm:'about',waitlist:c.wlFrom==='time'?'time':'intro'};if(c.step==='time'&&c.resched){c.resched=null;go('booked');break}go(m[c.step]||'intro');break}
+  case 'back':{const m={time:'intro',details:'time',about:'details',confirm:needIntake()?'about':'details',waitlist:c.wlFrom==='time'?'time':'intro'};if(c.step==='time'&&c.resched){c.resched=null;go('booked');break}go(m[c.step]||'intro');break}
   case 'pickType':c.type=ds.v;c.slot=null;c.day=null;break;
   case 'pickDay':c.day=Number(ds.v);c.slot=null;break;
   case 'pickSlot':c.slot=Number(ds.v);break;
@@ -818,20 +850,20 @@ function act(a,el){const ds=el.dataset,c=S.c,d=D();if(a!=='calMenu')S.t.calMenu=
       pubManage(b,{action:'reschedule',start:slot}).then(({st,j})=>{c.sending=false;
         if(j&&j.ok){b.start=slot;b.mail=j.mail;c.booked=b.id;c.resched=null;go('booked');toast('Session moved to '+fD(b.start)+', '+fT(b.start));render()}
         else if(st===409&&j.error==='slot'){toast('That time was just taken. Pick another.');c.slot=null;pubLoad()}
-        else{toast(st===409?'This session can no longer be moved online. Contact '+firstName(P().name)+'.':st===429?'Too many requests just now. Try again in an hour.':'We could not move it. Try again.');c.resched=null;go('booked');render()}})
+        else{toast(st===409?'This session can no longer be moved online. Contact '+tName()+'.':st===429?'Too many requests just now. Try again in an hour.':'We could not move it. Try again.');c.resched=null;go('booked');render()}})
       .catch(()=>{c.sending=false;toast('We could not reach the server. Check your connection and try again.');render()});
       return}
     if(c.resched){const b=d.appts.find(x=>x.id===c.resched);b.start=c.slot;b.reminded=false;c.booked=b.id;c.resched=null;go('booked');toast('Session moved to '+fD(b.start)+', '+fT(b.start));save();break}go('details');break;
-  case 'toAbout':{const e=valDetails();if(Object.keys(e).length){c.err=e;render();focusErr();return}go('about');break}
+  case 'toAbout':{const e=valDetails();if(Object.keys(e).length){c.err=e;render();focusErr();return}go(needIntake()?'about':'confirm');break}
   case 'toConfirm':{const e=valAbout();if(Object.keys(e).length){c.err=e;render();focusErr();return}go('confirm');break}
   case 'book':{if(!c.agree){c.err={agree:'Tick the box to agree before confirming'};render();focusErr();return}const ty=typeOf(c.type);
     if(d.appts.some(x=>x.status==='upcoming'&&x.start===c.slot)){toast('That time was just taken. Pick another.');go('time');c.slot=null;break}
     if(SLUG){if(c.sending)return;c.sending=true;toast('Booking your session…');
-      pubPost({kind:'booking',fn:c.d.fn,ln:c.d.ln,email:c.d.email,wa:c.d.wa,type:ty.id,start:c.slot,mode:c.mode||'Online',answers:c.a,guardian:minor()?c.g:null,agree:true,hp:c.d.hp})
+      pubPost({kind:'booking',fn:c.d.fn,ln:c.d.ln,email:c.d.email,wa:c.d.wa,type:ty.id,start:c.slot,mode:c.mode||'Online',answers:needIntake()?c.a:{},guardian:needIntake()&&minor()?c.g:null,agree:true,hp:c.d.hp,follow:!needIntake()})
       .then(({st,j})=>{c.sending=false;
-        if(j&&j.ok&&j.appt){if(j.room)D().settings.room=j.room;j.appt.mail=j.mail;D().appts.push(j.appt);(S.mine=S.mine||[]).push(j.appt);if(j.manage)(S.mg=S.mg||{})[j.appt.id]=j.manage.k;c.booked=j.appt.id;go('booked');toast('Booked');render()}
+        if(j&&j.ok&&j.appt){if(c.remember)meSave(c.d);else meClear();if(j.room)D().settings.room=j.room;j.appt.mail=j.mail;D().appts.push(j.appt);(S.mine=S.mine||[]).push(j.appt);if(j.manage)(S.mg=S.mg||{})[j.appt.id]=j.manage.k;c.booked=j.appt.id;go('booked');toast('Booked');render()}
         else if(st===409){toast('That time was just taken. Pick another.');c.slot=null;go('time');pubLoad()}
-        else if(st===429){toast('Too many requests just now. Try again in an hour, or contact '+firstName(P().name)+'.');render()}
+        else if(st===429){toast('Too many requests just now. Try again in an hour, or contact '+tName()+'.');render()}
         else{toast('We could not book that. Check your details and try again.');render()}})
       .catch(()=>{c.sending=false;toast('We could not reach the server. Check your connection and try again.');render()});
       return}
@@ -843,7 +875,7 @@ function act(a,el){const ds=el.dataset,c=S.c,d=D();if(a!=='calMenu')S.t.calMenu=
     if(SLUG){if(c.sending)return;c.sending=true;
       pubManage(b,{action:'cancel',reason:c.cancelReason||'Other'}).then(({st,j})=>{c.sending=false;
         if(j&&j.ok&&j.booking){Object.assign(b,{status:'cancelled',late:j.booking.late,lateFee:j.booking.lateFee,reason:j.booking.reason});c.cancelAsk=false}
-        else toast(st===429?'Too many requests just now. Try again in an hour.':'We could not cancel it. Try again, or contact '+firstName(P().name)+'.');render()})
+        else toast(st===429?'Too many requests just now. Try again in an hour.':'We could not cancel it. Try again, or contact '+tName()+'.');render()})
       .catch(()=>{c.sending=false;toast('We could not reach the server. Check your connection and try again.');render()});
       return}cancelAppt(b,c.cancelReason||'Other');c.cancelAsk=false;save();break}
   case 'joinWl':{const w=c.wl,e={};if(!w.fn.trim())e.fn='Enter your first name';if(!w.ln.trim())e.ln='Enter your last name';if(w.wa.replace(/\D/g,'').length!==10)e.wa='Enter a 10-digit number';if(Object.keys(e).length){c.err=e;render();focusErr();return}
@@ -887,12 +919,12 @@ function act(a,el){const ds=el.dataset,c=S.c,d=D();if(a!=='calMenu')S.t.calMenu=
   case 'apStatus':{const x=d.appts.find(y=>y.id===ds.id);x.status=ds.v;if(ds.v==='held'){x.paid=false;x.isNew=false}if(ds.v==='noshow'){x.lateFee=x.fee;x.paid=false;x.reason=x.reason||'No-show';x.isNew=false}if(ds.v==='upcoming'){x.lateFee=0;x.late=false;x.reason='';x.waived=false;x.paid=false}save();toast(ds.v==='held'?'Marked as held. Fee added to dues.':ds.v==='noshow'?'Marked as no-show. Full fee due.':'Restored');break}
   case 'apCancel':{const x=d.appts.find(y=>y.id===ds.id);cancelAppt(x,S.modal.reason||'Other');S.modal={kind:'ap',id:x.id};save();toast('Cancelled. The slot is open on your booking page.');break}
   case 'apPaid':{const x=d.appts.find(y=>y.id===ds.id);if(x.paid){x.paid=false;x.pay=null;save();toast('Marked unpaid');break}
-    S.modal={kind:'pay',id:x.id,method:'UPI',utr:'',from:'',date:new Date().toISOString().slice(0,10),err:'',back:S.modal&&S.modal.kind==='ap'?x.id:null};break}
+    S.modal={kind:'pay',id:x.id,method:'UPI',utr:(x.payClaim&&x.payClaim.utr)||'',from:'',date:new Date().toISOString().slice(0,10),err:'',back:S.modal&&S.modal.kind==='ap'?x.id:null};break}
   case 'payEdit':{const x=d.appts.find(y=>y.id===ds.id);const p=x.pay||{};S.modal={kind:'pay',id:x.id,method:p.method||'UPI',utr:p.utr||'',from:p.from||'',date:new Date(p.at||x.start).toISOString().slice(0,10),err:'',edit:true};break}
   case 'paySave':{const m=S.modal,x=d.appts.find(y=>y.id===m.id);const utr=String(m.utr||'').replace(/\s/g,'');
     if(m.method==='UPI'&&utr&&!/^\d{12}$/.test(utr)){m.err='A UPI transaction ID (UTR) is 12 digits. Check the client’s UPI app or your bank SMS.';break}
     const dup=utr&&d.appts.find(y=>y.id!==x.id&&y.pay&&y.pay.utr===utr);if(dup){m.err=`This reference is already recorded for ${nm(dup.name)} on ${fD(dup.pay.at)}. Check it isn’t the same payment.`;break}
-    const amount=payAmt(x);x.paid=true;x.pay={amount,method:m.method,utr,from:String(m.from||'').trim(),at:new Date(m.date+'T12:00:00').getTime()||Date.now()};
+    const amount=payAmt(x);x.payClaim=null;x.paid=true;x.pay={amount,method:m.method,utr,from:String(m.from||'').trim(),at:new Date(m.date+'T12:00:00').getTime()||Date.now()};
     S.modal=m.back?{kind:'ap',id:m.back,cancel:false,reason:'',show:false}:null;save();toast(utr||m.method==='Cash'?'Payment recorded':'Payment recorded. Add the reference later from Payments.');break}
   case 'newAp':{const fromC=ds.from==='clients';const day=ds.day||String(S.t.tab==='schedule'&&S.t.cal==='day'&&S.t.calDate?S.t.calDate:dayStart(Date.now()+3*36e5));const hasC=clientList().length>0;
     S.modal={kind:'newAp',from:ds.from||'cal',who:ds.client?'Existing client':(fromC||!hasC)?'New client':'Existing client',client:ds.client||'',fn:'',ln:'',wa:'',email:'',book:!fromC,type:fromC?'first':'follow',mode:'Online',day,time:ds.time||'',repeat:'Does not repeat',count:'4',label:'Confirmed',notify:true,err:{}};break}

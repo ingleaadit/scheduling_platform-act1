@@ -9,9 +9,9 @@ const DAY = 864e5;
 function nextMonday11() { let t = Date.now() + DAY; for (;;) { const d = new Date(t + 330 * 60000); if (d.getUTCDay() === 1) { d.setUTCHours(11, 0, 0, 0); return d.getTime() - 330 * 60000; } t += DAY; } }
 const START = nextMonday11();
 function practice() {
-  return { profile: { name: 'Asha Rao', where: 'Online' }, types: [{ id: 'first', name: 'First session', min: 60, fee: 1500 }],
+  return { profile: { name: 'Asha Rao', where: 'Online' }, types: [{ id: 'first', name: 'First session', min: 60, fee: 1500 }, { id: 'follow', name: 'Follow-up session', min: 50, fee: 1500 }],
     hours: { 0: [], 1: [['10:00', '13:00']], 2: [], 3: [], 4: [], 5: [], 6: [] }, blocks: [], intake: [{ id: 'age', label: 'How old are you?' }, { id: 'issue', label: 'Describe your issue', private: true }],
-    consent: '', settings: { cancelWindow: 24, latePct: 50, room: 'meet.example/room' }, busy: [], tzOff: -330 };
+    consent: '', settings: { cancelWindow: 24, latePct: 50, room: 'meet.example/room', upi: 'asha@okaxis' }, busy: [], tzOff: -330 };
 }
 const { makeFakeDb } = require('./fake-db');
 const { db, pool } = makeFakeDb('asha-rao-24ad3b', PID);
@@ -26,6 +26,7 @@ function res() { return { statusCode: 200, body: null, headers: {}, setHeader(k,
 const good = () => ({ t: 'asha-rao-24ad3b', kind: 'booking', fn: 'Ravi', ln: 'Kumar', email: 'ravi@example.com', wa: '98765 43210', type: 'first', start: START, mode: 'Online', answers: { age: '29', issue: 'Sleep', extra: 'ignored' }, agree: true });
 const post = async (body, ip) => { const r = res(); await book({ method: 'POST', body, headers: { 'x-forwarded-for': ip || '' } }, r); return r; };
 const mg = async (body) => { const r = res(); await manage({ method: 'POST', body, headers: {} }, r); return r; };
+const mgPaid = async (m, utr) => mg(Object.assign({}, m, { action: 'paid', utr }));
 const mgGet = async (query) => { const r = res(); await manage({ method: 'GET', query, headers: {} }, r); return r; };
 
 test('a valid booking is stored and returned', async () => {
@@ -89,6 +90,7 @@ test('the public page hides the video link and includes pending bookings as take
   const r = res(); await practiceApi({ query: { t: 'asha-rao-24ad3b' } }, r);
   assert.strictEqual(r.statusCode, 200);
   assert.strictEqual(r.body.data.settings.room, '');
+  assert.strictEqual(r.body.data.settings.upi, 'asha@okaxis', 'the UPI id is meant to be public');
   assert.deepStrictEqual(r.body.data.busy, [[START, START + 60 * 60000]]);
   assert.ok(!JSON.stringify(r.body).includes('token'), 'no keys on the public page');
   assert.ok(!JSON.stringify(r.body).includes('Ravi'), 'no client names on the public page');
@@ -205,4 +207,51 @@ test('the manage link goes in the confirmation email only from the configured si
   assert.match(sent[0].html, /https:\/\/book\.example\/\?t=asha-rao-24ad3b&amp;b=/);
   assert.ok(!sent[0].html.includes('evil.example'));
   assert.ok(!sent[1].html.includes('&amp;k='), 'the therapist’s copy has no client key');
+});
+
+// ---- follow-ups, payments, placeholder name ----
+test('a follow-up booking stores no first-session answers and needs none', async () => {
+  db.inbox = []; db.pub = practice();
+  const r = await post(Object.assign(good(), { type: 'follow', answers: { age: '29', issue: 'Should not be stored' }, guardian: { name: 'X', rel: 'Y', wa: '9' } }));
+  assert.strictEqual(r.statusCode, 200);
+  assert.strictEqual(db.inbox[0].payload.intake, null);
+  assert.strictEqual(db.inbox[0].payload.guardian, null);
+  assert.strictEqual(db.inbox[0].payload.dur, 50);
+  assert.ok(!JSON.stringify(db.inbox[0]).includes('Should not be stored'));
+});
+test('a first booking still keeps its intake answers', async () => {
+  db.inbox = []; await post(good());
+  assert.strictEqual(db.inbox[0].payload.intake.length, 2);
+});
+test('a client can report a UPI payment; it reaches the therapist as a claim, never as paid', async () => {
+  const m = await freshBooking();
+  assert.strictEqual((await mgPaid(m, '12345')).statusCode, 400, 'UTR must be 12 digits');
+  const r = await mgPaid(m, '123456789012');
+  assert.strictEqual(r.statusCode, 200); assert.strictEqual(r.body.booking.claimed, true);
+  const claim = db.inbox.find((x) => x.kind === 'payment');
+  assert.strictEqual(claim.payload.utr, '123456789012'); assert.strictEqual(claim.payload.apptId, 'b' + m.b);
+  assert.ok(!('paid' in claim.payload), 'a client cannot mark a session paid');
+  assert.strictEqual((await mgPaid(Object.assign({}, m, { k: 'wrong' }), '123456789012')).statusCode, 404);
+  assert.strictEqual((await mgPaid(m, '')).statusCode, 200, 'the UTR is optional');
+});
+test('a payment cannot be reported for a cancelled session', async () => {
+  const m = await freshBooking();
+  await mg(Object.assign({}, m, { action: 'cancel' }));
+  assert.strictEqual((await mgPaid(m, '123456789012')).statusCode, 409);
+});
+test('emails show the UPI id, and say "your therapist" while the name is still the placeholder', async () => {
+  db.inbox = []; db.pub = practice(); db.pub.profile.name = 'Your name'; db.pub.settings.room = ''; process.env.RESEND_API_KEY = 'k';
+  const sent = []; const realFetch = global.fetch; global.fetch = async (u, o) => { sent.push(JSON.parse(o.body)); return { ok: true, status: 200 }; };
+  await post(good());
+  global.fetch = realFetch; delete process.env.RESEND_API_KEY;
+  assert.match(sent[0].text, /asha@okaxis/);
+  assert.match(sent[0].text, /Your therapist will send the video link/);
+  assert.ok(!/Your will/.test(sent[0].html + sent[0].text));
+  assert.match(sent[0].subject, /with your therapist is booked/);
+  db.pub.profile.name = 'Asha Rao';
+});
+test('payment email names the client and asks the therapist to check the bank', () => {
+  const { paymentEmail } = require('../api/_lib/mail.js');
+  const m = paymentEmail({ clientName: 'Ravi', fee: 1500, start: START, tzOff: -330, utr: '123456789012' });
+  assert.match(m.subject, /Ravi says they paid ₹1,500/); assert.match(m.text, /Check your bank/); assert.match(m.text, /123456789012/);
 });

@@ -20,6 +20,7 @@ function makeFakeDb(slug, pid) {
         const base = { imported_at: null, cancelled_at: null, created_at: new Date().toISOString() };
         if (/'waitlist'/.test(sql)) db.inbox.push(Object.assign(base, { id: p[0], kind: 'waitlist', payload: JSON.parse(p[2]), ip_hash: p[3] }));
         else if (/'booking'/.test(sql)) db.inbox.push(Object.assign(base, { id: p[0], kind: 'booking', starts_at: p[2], ends_at: p[3], payload: JSON.parse(p[4]), summary: JSON.parse(p[5]), token_hash: p[6], ip_hash: p[7] }));
+        else if (/'payment'/.test(sql)) db.inbox.push(Object.assign(base, { id: crypto.randomUUID(), kind: 'payment', booking_id: p[1], payload: JSON.parse(p[2]), ip_hash: p[3] }));
         else if (/'cancel'/.test(sql)) db.inbox.push(Object.assign(base, { id: crypto.randomUUID(), kind: 'cancel', booking_id: p[1], payload: JSON.parse(p[2]), ip_hash: p[3] }));
         else db.inbox.push(Object.assign(base, { id: crypto.randomUUID(), kind: 'reschedule', booking_id: p[1], starts_at: p[2], ends_at: p[3], payload: JSON.parse(p[4]), ip_hash: p[5] }));
         return { rows: [] };
@@ -29,6 +30,7 @@ function makeFakeDb(slug, pid) {
         return { rows: r && db.pub && p[0] === slug ? [{ id: r.id, practitioner_id: pid, starts_at: r.starts_at, ends_at: r.ends_at, summary: JSON.parse(JSON.stringify(r.summary)), token_hash: r.token_hash, cancelled_at: r.cancelled_at, data: JSON.parse(JSON.stringify(db.pub)) }] : [] };
       }
       if (/set cancelled_at = now\(\), summary = summary/.test(sql)) { const r = db.inbox.find((x) => x.id === p[0]); r.cancelled_at = new Date().toISOString(); Object.assign(r.summary, JSON.parse(p[1])); return { rows: [] }; }
+      if (/^update public\.booking_inbox set summary = summary \|\| \$2::jsonb where id = \$1/.test(sql)) { const r = db.inbox.find((x) => x.id === p[0]); Object.assign(r.summary, JSON.parse(p[1])); return { rows: [] }; }
       if (/set starts_at = \$2, ends_at = \$3/.test(sql)) { const r = db.inbox.find((x) => x.id === p[0]); r.starts_at = p[1]; r.ends_at = p[2]; return { rows: [] }; }
       if (/set cancelled_at = now\(\) where booking_id/.test(sql)) { db.inbox.forEach((x) => { if (x.booking_id === p[0] && x.kind === 'reschedule' && !x.imported_at) x.cancelled_at = new Date().toISOString(); }); return { rows: [] }; }
       if (/from auth\.users/.test(sql)) return { rows: [{ email: 'therapist@example.com' }] };

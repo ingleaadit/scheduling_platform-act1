@@ -4,7 +4,7 @@ const crypto = require('crypto');
 const { getPool } = require('./_lib/db');
 const { confirmationEmail, therapistEmail, sendMail } = require('./_lib/mail');
 
-const { DAY, str, sha, slotAllowed, ipHash, overLimit, siteUrl } = require('./_lib/slots');
+const { DAY, str, sha, slotAllowed, ipHash, overLimit, siteUrl, therapistLabel } = require('./_lib/slots');
 
 function buildBooking(data, body) {
   const fn = str(body.fn, 60), ln = str(body.ln, 60), email = str(body.email, 120), wa = str(body.wa, 20).replace(/\D/g, '');
@@ -15,8 +15,10 @@ function buildBooking(data, body) {
   if (!ty || !Number.isFinite(start)) return { error: 'details' };
   if (start < Date.now() || start > Date.now() + 60 * DAY || !slotAllowed(data, start, ty.min)) return { error: 'slot' };
   const answers = body.answers && typeof body.answers === 'object' ? body.answers : {};
-  const intake = (data.intake || []).map((q) => ({ label: q.label, answer: str(answers[q.id], 2000), private: !!q.private })).filter((q) => q.answer);
-  const g = body.guardian && typeof body.guardian === 'object' ? { name: str(body.guardian.name, 80), rel: str(body.guardian.rel, 40), wa: str(body.guardian.wa, 20) } : null;
+  // Returning clients booking a follow-up are not asked the first-session questions, and none are stored.
+  const followUp = ty.id === 'follow';
+  const intake = followUp ? null : (data.intake || []).map((q) => ({ label: q.label, answer: str(answers[q.id], 2000), private: !!q.private })).filter((q) => q.answer);
+  const g = !followUp && body.guardian && typeof body.guardian === 'object' ? { name: str(body.guardian.name, 80), rel: str(body.guardian.rel, 40), wa: str(body.guardian.wa, 20) } : null;
   const id = crypto.randomUUID();
   const now = Date.now();
   return {
@@ -85,8 +87,8 @@ module.exports = async (req, res) => {
       const t = await client.query('select email from auth.users where id = $1', [pid]);
       const therapistAddr = t.rows.length ? t.rows[0].email : '';
       const s = data.settings || {}, prof = data.profile || {};
-      const info = { clientName: b.appt.name, therapistName: prof.name || 'your therapist', typeName: b.ty.name, min: b.ty.min, start: b.start, tzOff: data.tzOff, mode: b.appt.mode,
-        where: String(prof.where || '').replace(/^Online, and in person in /, ''), room: s.room, fee: b.ty.fee, cancelWindow: s.cancelWindow, latePct: s.latePct,
+      const info = { clientName: b.appt.name, therapistName: therapistLabel(prof), typeName: b.ty.name, min: b.ty.min, start: b.start, tzOff: data.tzOff, mode: b.appt.mode,
+        where: String(prof.where || '').replace(/^Online, and in person in /, ''), room: s.room, fee: b.ty.fee, upi: s.upi, cancelWindow: s.cancelWindow, latePct: s.latePct,
         manageUrl: siteUrl() ? `${siteUrl()}/?t=${slug}&b=${b.id}&k=${key}` : '' };
       mail = await sendMail(Object.assign({ to: b.appt.email, replyTo: therapistAddr }, confirmationEmail(info)));
       await sendMail(Object.assign({ to: therapistAddr }, therapistEmail(info)));
