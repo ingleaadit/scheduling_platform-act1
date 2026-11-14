@@ -96,6 +96,25 @@ test('the public page hides the video link and includes pending bookings as take
   assert.ok(!JSON.stringify(r.body).includes('Ravi'), 'no client names on the public page');
   const nf = res(); await practiceApi({ query: { t: 'nobody-000000' } }, nf); assert.strictEqual(nf.statusCode, 404);
 });
+test('emails go through SMTP when SMTP_USER and SMTP_PASS are set, ahead of Resend, and a failure does not undo the booking', async () => {
+  const mail = require('../api/_lib/mail');
+  db.inbox = []; process.env.SMTP_USER = 'sender@gmail.com'; process.env.SMTP_PASS = 'abcdabcdabcdabcd'; process.env.RESEND_API_KEY = 'should-not-be-used';
+  const sent = []; const realFetch = global.fetch; let fetched = 0;
+  global.fetch = async () => { fetched++; return { ok: true, status: 200 }; };
+  mail._transport = () => ({ sendMail: async (m) => { sent.push(m); } });
+  let r = await post(good());
+  assert.strictEqual(r.body.mail, 'sent');
+  assert.strictEqual(sent.length, 2);
+  assert.strictEqual(fetched, 0, 'Resend is not called when SMTP is configured');
+  assert.strictEqual(sent[0].to, 'ravi@example.com');
+  assert.strictEqual(sent[0].from, 'Practice <sender@gmail.com>');
+  assert.strictEqual(sent[0].replyTo, 'therapist@example.com');
+  assert.strictEqual(sent[1].to, 'therapist@example.com');
+  db.inbox = []; mail._transport = () => ({ sendMail: async () => { const e = new Error('auth'); e.code = 'EAUTH'; throw e; } });
+  r = await post(good());
+  assert.strictEqual(r.statusCode, 200); assert.strictEqual(r.body.mail, 'failed'); assert.strictEqual(db.inbox.length, 1);
+  delete mail._transport; global.fetch = realFetch; delete process.env.SMTP_USER; delete process.env.SMTP_PASS; delete process.env.RESEND_API_KEY;
+});
 test('emails are sent through Resend when a key is set, and a mail failure does not undo the booking', async () => {
   db.inbox = []; process.env.RESEND_API_KEY = 'test-key';
   const sent = []; const realFetch = global.fetch;

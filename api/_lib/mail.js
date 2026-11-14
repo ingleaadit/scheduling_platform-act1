@@ -1,5 +1,9 @@
-// Email templates and sending. Sending uses Resend (https://resend.com) when RESEND_API_KEY is set;
-// without the key nothing is sent and the booking still goes through.
+// Email templates and sending. Two ways to send, first match wins:
+//   1. SMTP (for example a Gmail account with an app password) when SMTP_USER and SMTP_PASS are set.
+//      SMTP_HOST (default smtp.gmail.com) and SMTP_PORT (default 465) are optional.
+//   2. Resend (https://resend.com) when RESEND_API_KEY is set. Without a verified domain it only delivers to the account owner.
+// With neither set nothing is sent and the booking still goes through.
+// MAIL_FROM sets the "from" line, for example: Practice <you@gmail.com>.
 const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const firstName = (n) => String(n || '').trim().split(/\s+/)[0] || '';
 const money = (n) => '₹' + Math.round(Number(n) || 0).toLocaleString('en-IN');
@@ -95,9 +99,29 @@ function paymentEmail(c) {
 }
 
 // Returns 'sent', 'skipped' (no key set) or 'failed'. Never throws.
+let smtp = null;
+function smtpTransport() {
+  if (smtp && smtp.key === process.env.SMTP_USER + '|' + process.env.SMTP_PASS) return smtp.t;
+  const nodemailer = require('nodemailer');
+  const port = Number(process.env.SMTP_PORT) || 465;
+  const t = nodemailer.createTransport({ host: process.env.SMTP_HOST || 'smtp.gmail.com', port, secure: port === 465, auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS }, connectionTimeout: 8000, greetingTimeout: 8000, socketTimeout: 10000 });
+  smtp = { key: process.env.SMTP_USER + '|' + process.env.SMTP_PASS, t };
+  return t;
+}
 async function sendMail({ to, subject, html, text, replyTo }) {
+  if (!to) return 'skipped';
+  if (process.env.SMTP_USER && process.env.SMTP_PASS) {
+    try {
+      const t = (module.exports._transport || smtpTransport)();
+      await t.sendMail({ from: process.env.MAIL_FROM || 'Practice <' + process.env.SMTP_USER + '>', to, subject, html, text, replyTo: replyTo || undefined });
+      return 'sent';
+    } catch (e) {
+      console.error('smtp mail failed', e.code || e.responseCode || e.name);
+      return 'failed';
+    }
+  }
   const key = process.env.RESEND_API_KEY;
-  if (!key || !to) return 'skipped';
+  if (!key) return 'skipped';
   const ctl = new AbortController();
   const timer = setTimeout(() => ctl.abort(), 6000);
   try {
