@@ -1210,13 +1210,13 @@ function renderModal(){const m=S.modal,s=D().settings;
   if(m.kind==='newAp'){const e=m.err||{},ty=typeOf(m.type),dayT=Number(m.day),wd=new Date(dayT).getDay(),bz=busy(dayT);
     const opts=TIMES.filter(t=>t<='21:00').map(t=>{const s=at(dayT,t),en=s+ty.min*6e4;const clash=bz.some(([a,b])=>s<b&&en>a);const inH=(D().hours[wd]||[]).some(([f,to])=>t>=f&&at(dayT,to)>=en);return {t,clash,inH,label:hmLabel(t)+(clash?' · busy':inH?'':' · outside your hours')}});
     if(!m.time){const f=opts.find(o=>o.inH&&!o.clash&&at(dayT,o.t)>Date.now());m.time=f?f.t:'10:00'}
-    const isNew=m.who==='New client',book=!isNew||m.book;const names=clientList().map(c=>c.name);
+    const isNew=m.who==='New client',book=!isNew||m.book;const names=clientList().map(c=>c.name);const pick=!isNew&&m.client?clientList().find(x=>x.name===m.client):null,needCem=!!(book&&pick&&!pick.email);
     const dayOpts=[];for(let i=-14;i<=60;i++)dayOpts.push(addDays(T0,i));
     const sel=(id,label,path,options,cur,err)=>`<div class="f${err?' bad':''}"><label for="${id}">${label}</label><select class="in" id="${id}" data-f="${path}">${options.map(([v,l])=>`<option value="${esc(v)}" ${String(v)===String(cur)?'selected':''}>${esc(l)}</option>`).join('')}</select>${err?`<span class="err">${esc(err)}</span>`:''}</div>`;
     return sheet(isNew&&!book?'Add client':'New session','',`${names.length?chips('modal.who',['Existing client','New client'],'Client'):''}
-     ${isNew?`<div class="grid2">${field('nfn','First name','modal.fn',{err:e.fn})}${field('nln','Last name','modal.ln',{req:false})}</div>${field('nwa','WhatsApp number','modal.wa',{type:'tel',mode:'numeric',pre:'+91',err:e.wa})}${field('nem','Email, optional','modal.email',{type:'email',req:false})}
+     ${isNew?`<div class="grid2">${field('nfn','First name','modal.fn',{err:e.fn})}${field('nln','Last name','modal.ln',{req:false})}</div>${field('nwa','WhatsApp number','modal.wa',{type:'tel',mode:'numeric',pre:'+91',err:e.wa})}${field('nem',book?'Email':'Email, optional','modal.email',{type:'email',req:book,err:e.em,hint:book?'Their session reminder and reschedule link are sent here.':''})}
        <label class="tg"><span>Book a session now<small>Or just save them to your clients</small></span><input type="checkbox" class="tgl" data-f="modal.book" ${m.book?'checked':''}></label>`
-      :sel('ncl','Name','modal.client',[['','Choose a client']].concat(names.map(n=>[n,nm(n)])),m.client,e.client)}
+      :sel('ncl','Name','modal.client',[['','Choose a client']].concat(names.map(n=>[n,nm(n)])),m.client,e.client)+(needCem?field('ncem','Their email','modal.cemail',{type:'email',err:e.cem,hint:'No email is saved for them yet. Their session reminder and reschedule link are sent here.'}):'')}
      ${book?`<div class="grid2">${sel('nty','Session','modal.type',D().types.map(t=>[t.id,t.name+' · '+t.min+' min · '+money(t.fee)]),m.type)}${sel('nmo','Where','modal.mode',[['Online','Online'],['In person','In person']],m.mode)}</div>
       <div class="grid2">${sel('nday','Day','modal.day',dayOpts.map(d=>[d,(d===T0?'Today · ':'')+fD(d)]),m.day)}${sel('ntm','Time','modal.time',opts.map(o=>[o.t,o.label]),m.time,e.time)}</div>
       <div class="grid2">${sel('nrp','Repeat','modal.repeat',[['Does not repeat','Does not repeat'],['Every week','Every week'],['Every 2 weeks','Every 2 weeks']],m.repeat)}${m.repeat!=='Does not repeat'?sel('nct','Number of sessions','modal.count',[2,3,4,6,8,10,12].map(n=>[n,n+' sessions']),m.count):''}</div>
@@ -1348,11 +1348,14 @@ function act(a,el){const ds=el.dataset,c=S.c,d=D();if(a!=='calMenu')S.t.calMenu=
     if(isNew){if(!String(m.fn).trim())e.fn='Enter a first name';if(String(m.wa).replace(/\D/g,'').length!==10)e.wa='Enter a 10-digit WhatsApp number';name=(String(m.fn).trim()+' '+String(m.ln).trim()).trim();wa='+91 '+String(m.wa).trim();email=String(m.email).trim();
       if(name&&clientList().some(c=>c.name.toLowerCase()===name.toLowerCase()))e.fn='You already have a client with this name. Pick them under Existing client.'}
     else{const c=clientList().find(x=>x.name===m.client);if(!c)e.client='Choose a client';else{name=c.name;wa=c.wa||'';email=c.email||''}}
-    const book=!isNew||m.book,ty=typeOf(m.type),step=m.repeat==='Every week'?7:m.repeat==='Every 2 weeks'?14:0,starts=[];
+    const book=!isNew||m.book,ty=typeOf(m.type);let fillEmail=false;
+    if(book&&!e.client){if(isNew){if(!/^\S+@\S+\.\S+$/.test(email))e.em='Enter their email address. The session reminder is sent there.'}else if(!email){const ce=String(m.cemail||'').trim();if(!/^\S+@\S+\.\S+$/.test(ce))e.cem='Enter their email address. The session reminder is sent there.';else{email=ce;fillEmail=true}}}
+    const step=m.repeat==='Every week'?7:m.repeat==='Every 2 weeks'?14:0,starts=[];
     if(book&&!Object.keys(e).length){const n=step?Number(m.count):1;for(let i=0;i<n;i++)starts.push(at(addDays(Number(m.day),i*step),m.time));
       for(const s of starts){const dd=dayStart(s),en=s+ty.min*6e4;const hit=D().appts.find(a=>a.status==='upcoming'&&a.start<en&&s<a.start+a.dur*6e4);if(hit){e.time=`${fD(s)}, ${fT(s)} overlaps ${nm(hit.name)}’s session.`;break}const bl=allBlocks(dd).find(b=>s<at(dd,b.to)&&en>at(dd,b.from));if(bl){e.time=`${fD(s)}, ${fT(s)} is blocked: ${bl.note||'Blocked'}.`;break}}}
     if(Object.keys(e).length){m.err=e;break}
     if(isNew)d.clients.push({id:'k'+Date.now(),name,wa,email,added:Date.now()});
+    else if(fillEmail){const k=(d.clients||[]).find(x=>x.name===name);if(k)k.email=email;else d.clients.push({id:'k'+Date.now(),name,wa,email,added:Date.now()});d.appts.forEach(a=>{if(a.name===name&&!a.email)a.email=email})}
     const lab=m.label==='Confirmed'?'confirmed':m.label==='No response'?'noresp':null;const ids=[];
     starts.forEach((s,i)=>{const id='a'+Date.now()+'_'+i;ids.push(id);d.appts.push({id,name,wa,email,type:ty.id,start:s,dur:ty.min,fee:ty.fee,status:'upcoming',paid:false,lateFee:0,late:false,reason:'',waived:false,intake:null,guardian:null,source:'Added by you',reminded:false,mode:m.mode,label:lab})});
     save();toast(ids.length?`${ids.length===1?'Session':ids.length+' sessions'} booked for ${nm(name)}`:`${nm(name)} added to your clients`);
