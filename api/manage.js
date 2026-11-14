@@ -3,7 +3,7 @@
 const crypto = require('crypto');
 const { getPool } = require('./_lib/db');
 const { str, sha, slotAllowed, ipHash, overLimit, siteUrl, therapistLabel } = require('./_lib/slots');
-const { changeEmail, paymentEmail, sendMail } = require('./_lib/mail');
+const { changeEmail, paymentEmail, attendEmail, sendMail } = require('./_lib/mail');
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 const REASONS = ['Unwell', 'Work or travel', 'Clinical reason', 'Forgot', 'Other'];
@@ -13,14 +13,15 @@ function sameHash(a, b) { const x = Buffer.from(String(a || '')), y = Buffer.fro
 async function find(client, slug, id, key) {
   if (!/^[a-z0-9-]{3,60}$/.test(slug) || !UUID.test(id) || !key || key.length > 80) return null;
   const r = await client.query(
-    "select b.id, b.practitioner_id, b.starts_at, b.ends_at, b.summary, b.token_hash, b.cancelled_at, p.data from public.booking_inbox b join public.practice_public p on p.practitioner_id = b.practitioner_id where p.slug = $1 and b.id = $2 and b.kind = 'booking'", [slug, id]);
-  if (!r.rows.length || !sameHash(r.rows[0].token_hash, sha(key))) return null;
+    "select b.id, b.practitioner_id, b.starts_at, b.ends_at, b.summary, b.token_hash, b.remind_hash, b.cancelled_at, p.data from public.booking_inbox b join public.practice_public p on p.practitioner_id = b.practitioner_id where p.slug = $1 and b.id = $2 and b.kind = 'booking'", [slug, id]);
+  // The booking-confirmation key or the key sent in the reminder email both open the booking.
+  if (!r.rows.length || !(sameHash(r.rows[0].token_hash, sha(key)) || (r.rows[0].remind_hash && sameHash(r.rows[0].remind_hash, sha(key))))) return null;
   return r.rows[0];
 }
 function view(row) {
   const s = row.summary || {}, start = new Date(row.starts_at).getTime();
   return { id: 'b' + row.id, name: s.name || '', email: s.email || '', type: s.type, start, dur: s.dur, fee: s.fee, mode: s.mode || 'Online',
-    status: row.cancelled_at ? 'cancelled' : 'upcoming', claimed: !!(s.pay), late: !!(s.cancel && s.cancel.late), lateFee: (s.cancel && s.cancel.lateFee) || 0, reason: (s.cancel && s.cancel.reason) || '' };
+    status: row.cancelled_at ? 'cancelled' : 'upcoming', claimed: !!(s.pay), attend: (s.attend && s.attend.answer) || '', late: !!(s.cancel && s.cancel.late), lateFee: (s.cancel && s.cancel.lateFee) || 0, reason: (s.cancel && s.cancel.reason) || '' };
 }
 
 module.exports = async (req, res) => {
@@ -68,6 +69,15 @@ module.exports = async (req, res) => {
       await client.query('commit');
       row.summary = Object.assign({}, sum, { pay: { utr, at: now } });
       mailInfo = { kind: 'paid', start: oldStart, utr, fee: sum.fee };
+    } else if (src.action === 'attend') {
+      // The client's answer to the reminder email. It changes nothing about the session; it only tells the therapist.
+      const answer = src.answer === 'no' ? 'no' : 'yes';
+      await client.query("update public.booking_inbox set summary = summary || $2::jsonb where id = $1", [row.id, JSON.stringify({ attend: { answer, at: now } })]);
+      await client.query("insert into public.booking_inbox (practitioner_id, kind, booking_id, payload, ip_hash) values ($1, 'attend', $2, $3, $4)",
+        [pid, row.id, JSON.stringify({ id: 't' + crypto.randomUUID(), apptId, answer, at: now }), ipHash(req, pid)]);
+      await client.query('commit');
+      row.summary = Object.assign({}, sum, { attend: { answer, at: now } });
+      mailInfo = { kind: 'attend', answer, start: oldStart };
     } else if (src.action === 'reschedule') {
       const start = Number(src.start), dur = Number(sum.dur) || ty.min, end = start + dur * 60000;
       if (late) { await client.query('rollback'); return res.status(409).json({ ok: false, error: 'late' }); }
@@ -101,6 +111,8 @@ module.exports = async (req, res) => {
         manageUrl: siteUrl() ? `${siteUrl()}/?t=${slug}&b=${row.id}&k=${key}` : '' }, mailInfo);
       if (mailInfo.kind === 'paid') {
         await sendMail(Object.assign({ to: therapistAddr }, paymentEmail(base)));
+      } else if (mailInfo.kind === 'attend') {
+        if (mailInfo.answer === 'no') await sendMail(Object.assign({ to: therapistAddr }, attendEmail(base)));
       } else {
         mail = await sendMail(Object.assign({ to: sum.email, replyTo: therapistAddr }, changeEmail(base)));
         await sendMail(Object.assign({ to: therapistAddr }, changeEmail(Object.assign({ forTherapist: true }, base))));

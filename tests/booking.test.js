@@ -20,6 +20,7 @@ require.cache[path.resolve(__dirname, '../api/_lib/db.js')] = { id: 'db', filena
 const book = require('../api/book.js');
 const practiceApi = require('../api/practice.js');
 const manage = require('../api/manage.js');
+const remind = require('../api/remind.js');
 const { confirmationEmail, therapistEmail, changeEmail } = require('../api/_lib/mail.js');
 
 function res() { return { statusCode: 200, body: null, headers: {}, setHeader(k, v) { this.headers[k] = v; }, status(c) { this.statusCode = c; return this; }, json(o) { this.body = o; return this; } }; }
@@ -122,7 +123,7 @@ test('emails are sent through Resend when a key is set, and a mail failure does 
   let r = await post(good());
   assert.strictEqual(r.body.mail, 'sent');
   assert.strictEqual(sent.length, 2);
-  assert.ok(!sent[0].body.html.includes('Reschedule or cancel'), 'no manage link unless the site address is configured');
+  assert.ok(!sent[0].body.html.includes('>Reschedule<'), 'no manage link unless the site address is configured');
   assert.deepStrictEqual(sent[0].body.to, ['ravi@example.com']);
   assert.strictEqual(sent[0].body.reply_to, 'therapist@example.com');
   assert.deepStrictEqual(sent[1].body.to, ['therapist@example.com']);
@@ -284,4 +285,77 @@ test('payment email names the client and asks the therapist to check the bank', 
   const { paymentEmail } = require('../api/_lib/mail.js');
   const m = paymentEmail({ clientName: 'Ravi', fee: 1500, start: START, tzOff: -330, utr: '123456789012' });
   assert.match(m.subject, /Ravi says they paid ₹1,500/); assert.match(m.text, /Check your bank/); assert.match(m.text, /123456789012/);
+});
+
+// ---- reminder email 30 minutes before, and the client's reply ----
+const runRemind = async () => { const r = res(); await remind({ method: 'GET', headers: {} }, r); return r; };
+async function bookSoon(minsAhead) {
+  // A booking row that starts in `minsAhead` minutes, made well before that.
+  db.inbox = []; db.practiceData = null;
+  const r = await post(good()); assert.strictEqual(r.statusCode, 200);
+  const row = db.inbox[0]; row.starts_at = new Date(Date.now() + minsAhead * 60000).toISOString(); row.ends_at = new Date(Date.now() + (minsAhead + 60) * 60000).toISOString();
+  row.created_at = new Date(Date.now() - 3 * 36e5).toISOString();
+  return { row, key: r.body.manage.k, id: r.body.manage.b };
+}
+test('the confirmation email has a small centred Reschedule link, not a big button', () => {
+  const m = confirmationEmail({ clientName: 'Ravi', therapistName: 'Asha Rao', typeName: 'First session', min: 60, start: START, tzOff: -330, mode: 'Online', fee: 1500, cancelWindow: 24, latePct: 50, manageUrl: 'https://x.example/?t=a&b=b&k=k' });
+  assert.ok(/text-align:center[^>]*><a href="https:\/\/x\.example[^"]*"[^>]*>Reschedule<\/a>/.test(m.html), 'centred link');
+  assert.ok(!/display:inline-block;background:#0A0908/.test(m.html), 'no big button');
+  assert.ok(/Reschedule \(private link/.test(m.text));
+});
+test('a reminder goes out once, 30 minutes before, with Yes and Reschedule links that open the booking', async () => {
+  process.env.SITE_URL = 'https://book.example'; process.env.RESEND_API_KEY = 'k';
+  const sent = []; const realFetch = global.fetch; global.fetch = async (u, o) => { sent.push(JSON.parse(o.body)); return { ok: true, status: 200 }; };
+  db.pub.settings.room = 'meet.example/room';
+  const { row, id } = await bookSoon(29); sent.length = 0;
+  let r = await runRemind();
+  assert.strictEqual(r.body.sent, 1); assert.strictEqual(sent.length, 1);
+  assert.deepStrictEqual(sent[0].to, ['ravi@example.com']);
+  assert.match(sent[0].subject, /^Reminder: your session with Asha Rao is at /);
+  const yes = (sent[0].text.match(/Yes, I'll be there: (\S+)/) || [])[1], chg = (sent[0].text.match(/Reschedule: (\S+)/) || [])[1];
+  assert.ok(yes && /&a=yes$/.test(yes) && chg && /&a=no$/.test(chg));
+  assert.match(sent[0].html, /Yes, I’ll be there/); assert.match(sent[0].html, />Reschedule</);
+  assert.ok(sent[0].html.includes('Join the video call'), 'video link is in the reminder: ');
+  assert.ok(row.remind_sent_at, 'marked as sent');
+  const key = new URL(yes).searchParams.get('k');
+  assert.notStrictEqual(key, undefined);
+  // the reminder key opens the booking; a wrong key does not
+  assert.strictEqual((await mgGet({ t: 'asha-rao-24ad3b', b: id, k: key })).statusCode, 200);
+  assert.strictEqual((await mgGet({ t: 'asha-rao-24ad3b', b: id, k: 'wrong' })).statusCode, 404);
+  // nothing more on the next run
+  sent.length = 0; r = await runRemind(); assert.strictEqual(sent.length, 0);
+  global.fetch = realFetch; delete process.env.RESEND_API_KEY; delete process.env.SITE_URL;
+});
+test('no reminder when the session is further off than 35 minutes, was cancelled, was moved by the therapist, or was booked at short notice', async () => {
+  process.env.SITE_URL = 'https://book.example'; process.env.RESEND_API_KEY = 'k';
+  const sent = []; const realFetch = global.fetch; global.fetch = async (u, o) => { sent.push(JSON.parse(o.body)); return { ok: true, status: 200 }; };
+  let b = await bookSoon(90); sent.length = 0; await runRemind(); assert.strictEqual(sent.length, 0, 'too early');
+  b = await bookSoon(20); b.row.cancelled_at = new Date().toISOString(); sent.length = 0; await runRemind(); assert.strictEqual(sent.length, 0, 'cancelled');
+  b = await bookSoon(20); db.practiceData = { appts: [{ id: 'b' + b.row.id, status: 'cancelled', start: new Date(b.row.starts_at).getTime() }] }; sent.length = 0; await runRemind(); assert.strictEqual(sent.length, 0, 'cancelled in the console');
+  b = await bookSoon(20); db.practiceData = { appts: [{ id: 'b' + b.row.id, status: 'upcoming', start: new Date(b.row.starts_at).getTime() + 36e5 }] }; sent.length = 0; await runRemind(); assert.strictEqual(sent.length, 0, 'moved in the console');
+  b = await bookSoon(20); b.row.created_at = new Date(Date.now() - 5 * 60000).toISOString(); sent.length = 0; await runRemind(); assert.strictEqual(sent.length, 0, 'booked less than 30 minutes ahead');
+  db.pub.settings.remind30 = false; b = await bookSoon(20); sent.length = 0; await runRemind(); assert.strictEqual(sent.length, 0, 'switched off'); delete db.pub.settings.remind30;
+  db.practiceData = null; global.fetch = realFetch; delete process.env.RESEND_API_KEY; delete process.env.SITE_URL;
+});
+test('a failed reminder is tried again on the next run', async () => {
+  process.env.SITE_URL = 'https://book.example'; process.env.RESEND_API_KEY = 'k';
+  const realFetch = global.fetch; let ok = false; global.fetch = async () => ({ ok, status: ok ? 200 : 500 });
+  const { row } = await bookSoon(20);
+  let r = await runRemind(); assert.strictEqual(r.body.sent, 0); assert.ok(!row.remind_sent_at, 'unclaimed after a failure');
+  ok = true; r = await runRemind(); assert.strictEqual(r.body.sent, 1); assert.ok(row.remind_sent_at);
+  global.fetch = realFetch; delete process.env.RESEND_API_KEY; delete process.env.SITE_URL;
+});
+test('the client answers the reminder; the therapist is told, and only a "no" sends an email', async () => {
+  process.env.SITE_URL = 'https://book.example'; process.env.RESEND_API_KEY = 'k';
+  const sent = []; const realFetch = global.fetch; global.fetch = async (u, o) => { sent.push(JSON.parse(o.body)); return { ok: true, status: 200 }; };
+  const { row, key, id } = await bookSoon(25); sent.length = 0;
+  const m = { t: 'asha-rao-24ad3b', b: id, k: key };
+  let r = await mg(Object.assign({}, m, { action: 'attend', answer: 'yes' }));
+  assert.strictEqual(r.statusCode, 200); assert.strictEqual(r.body.booking.attend, 'yes'); assert.strictEqual(sent.length, 0, 'no email for yes');
+  const row1 = db.inbox.find((x) => x.kind === 'attend'); assert.ok(row1 && row1.payload.apptId === 'b' + id && row1.payload.answer === 'yes');
+  r = await mg(Object.assign({}, m, { action: 'attend', answer: 'no' }));
+  assert.strictEqual(r.statusCode, 200); assert.strictEqual(r.body.booking.attend, 'no');
+  assert.strictEqual(sent.length, 1); assert.deepStrictEqual(sent[0].to, ['therapist@example.com']); assert.match(sent[0].subject, /can’t make their session/);
+  assert.ok(!row.cancelled_at, 'the session is not cancelled by this');
+  global.fetch = realFetch; delete process.env.RESEND_API_KEY; delete process.env.SITE_URL;
 });

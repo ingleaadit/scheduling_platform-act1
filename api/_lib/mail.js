@@ -46,11 +46,11 @@ function confirmationEmail(b) {
     `<p style="margin:0 0 8px;font-size:15px;line-height:1.55">This confirms your session with ${esc(b.therapistName)}.</p>` +
     rows([['Session', esc(`${b.typeName}, ${b.min} min`)], ['When', esc(when)], ['Where', whereHtml], ['Fee', esc(feeText)]]) +
     (policy ? `<p style="margin:0 0 12px;font-size:14px;line-height:1.55;color:#5E5850">${esc(policy)}</p>` : '') +
-    (b.manageUrl ? `<p style="margin:0 0 16px"><a href="${esc(b.manageUrl)}" style="display:inline-block;background:#0A0908;color:#FFFFFF;text-decoration:none;font-size:15px;padding:11px 18px;border-radius:8px">Reschedule or cancel</a></p><p style="margin:0 0 12px;font-size:13px;line-height:1.55;color:#5E5850">This link is private to you. Anyone who has it can change this booking, so don’t forward this email.</p>`
+    (b.manageUrl ? `<p style="margin:6px 0 18px;text-align:center;font-size:14px"><a href="${esc(b.manageUrl)}" style="color:#0A0908;text-decoration:underline">Reschedule</a></p><p style="margin:0 0 12px;font-size:13px;line-height:1.55;color:#5E5850;text-align:center">This link is private to you. Anyone who has it can change or cancel this booking, so don’t forward this email.</p>`
       : `<p style="margin:0 0 12px;font-size:14px;line-height:1.55;color:#5E5850">To change or cancel, reply to this email.</p>`) +
     `<p style="margin:0;font-size:13px;line-height:1.55;color:#5E5850">In crisis or thinking of harming yourself? Call Tele-MANAS on 14416, free and open all day, every day.</p>`);
   const text = [`You're booked, ${firstName(b.clientName)}.`, '', `This confirms your session with ${b.therapistName}.`, '',
-    `Session: ${b.typeName}, ${b.min} min`, `When: ${when}`, `Where: ${whereText}`, `Fee: ${feeText}`, '', policy, b.manageUrl ? 'Reschedule or cancel (private link, do not forward): ' + b.manageUrl : 'To change or cancel, reply to this email.', '',
+    `Session: ${b.typeName}, ${b.min} min`, `When: ${when}`, `Where: ${whereText}`, `Fee: ${feeText}`, '', policy, b.manageUrl ? 'Reschedule (private link, do not forward): ' + b.manageUrl : 'To change or cancel, reply to this email.', '',
     'In crisis or thinking of harming yourself? Call Tele-MANAS on 14416, free and open all day, every day.'].filter((l) => l !== null).join('\n');
   return { subject, html, text };
 }
@@ -84,6 +84,45 @@ function changeEmail(c) {
     (fee ? `<p style="margin:0 0 12px;font-size:14px;line-height:1.55;color:#5E5850">${esc(fee)}</p>` : '') +
     (moved && !c.forTherapist && c.manageUrl ? `<p style="margin:0"><a href="${esc(c.manageUrl)}" style="color:#0A0908;font-size:14px">Reschedule or cancel</a></p>` : ''));
   const text = [line, '', ...list.map(([k, v]) => `${k}: ${v}`), '', fee].join('\n');
+  return { subject, html, text };
+}
+
+// Sent to the client about 30 minutes before the session. The two buttons open the booking page, where they answer.
+// r: { clientName, therapistName, typeName, min, start, tzOff, mode, where, room, yesUrl, changeUrl }
+function timeText(start, tzOff) {
+  const d = new Date(Number(start) - (Number(tzOff) || 0) * 60000);
+  return d.toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit', hour12: true, timeZone: 'UTC' }).replace(/\s/g, ' ').toLowerCase();
+}
+function reminderEmail(r) {
+  const at = timeText(r.start, r.tzOff);
+  const online = r.mode !== 'In person';
+  const link = online && r.room ? (/^https?:\/\//.test(r.room) ? r.room : 'https://' + r.room) : '';
+  const tf = /^your therapist$/i.test(r.therapistName) ? 'your therapist' : r.therapistName;
+  const whereText = online ? (link ? 'Online. Video link: ' + link : 'Online') : 'In person' + (r.where ? ', ' + r.where : '');
+  const whereHtml = online ? (link ? `Online. <a href="${esc(link)}" style="color:#0A0908">Join the video call</a>` : 'Online') : esc(whereText);
+  const subject = `Reminder: your session with ${r.therapistName} is at ${at} today`;
+  const btn = (href, label, dark) => `<a href="${esc(href)}" style="display:inline-block;text-decoration:none;font-size:15px;padding:12px 18px;border-radius:8px;${dark ? 'background:#0A0908;color:#FFFFFF;border:1px solid #0A0908' : 'background:#FFFFFF;color:#0A0908;border:1px solid #0A0908'}">${esc(label)}</a>`;
+  const html = shell(`Your session is at ${at}`,
+    `<p style="margin:0 0 8px;font-size:15px;line-height:1.55">Hi ${esc(firstName(r.clientName))}, your session with ${esc(tf)} starts in about 30 minutes.</p>` +
+    rows([['Session', esc(`${r.typeName}, ${r.min} min`)], ['When', esc(whenText(r.start, r.tzOff))], ['Where', whereHtml]]) +
+    (r.yesUrl ? `<p style="margin:0 0 10px;font-size:15px;font-weight:600">Will you be there?</p><p style="margin:0 0 16px">${btn(r.yesUrl, 'Yes, I’ll be there', true)} &nbsp; ${btn(r.changeUrl, 'Reschedule', false)}</p>` +
+      `<p style="margin:0 0 12px;font-size:13px;line-height:1.55;color:#5E5850">These links are private to you, so please don’t forward this email.</p>` : `<p style="margin:0 0 12px;font-size:14px;line-height:1.55;color:#5E5850">If you can’t make it, reply to this email.</p>`) +
+    `<p style="margin:0;font-size:13px;line-height:1.55;color:#5E5850">In crisis or thinking of harming yourself? Call Tele-MANAS on 14416, free and open all day, every day.</p>`);
+  const text = [`Hi ${firstName(r.clientName)}, your session with ${tf} starts in about 30 minutes.`, '', `Session: ${r.typeName}, ${r.min} min`, `When: ${whenText(r.start, r.tzOff)}`, `Where: ${whereText}`, '',
+    r.yesUrl ? `Will you be there?\nYes, I'll be there: ${r.yesUrl}\nReschedule: ${r.changeUrl}\n(Private links, do not forward.)` : 'If you can\'t make it, reply to this email.', '',
+    'In crisis or thinking of harming yourself? Call Tele-MANAS on 14416, free and open all day, every day.'].join('\n');
+  return { subject, html, text };
+}
+
+// Sent to the therapist when a client answers the reminder with "I can't make it". The session is not cancelled; the therapist decides what happens next.
+function attendEmail(c) {
+  const when = whenText(c.start, c.tzOff);
+  const subject = `${c.clientName} can’t make their session: ${when}`;
+  const html = shell('Client can’t make it',
+    `<p style="margin:0 0 8px;font-size:15px;line-height:1.55">${esc(c.clientName)} replied to the reminder to say they can’t make this session.</p>` +
+    rows([['Session', esc(`${c.typeName}, ${c.min} min`)], ['When', esc(when)]]) +
+    `<p style="margin:0;font-size:14px;line-height:1.55;color:#5E5850">The session has not been cancelled. Contact them to rearrange, then update it in your console.</p>`);
+  const text = [`${c.clientName} replied to the reminder to say they can't make this session.`, '', `Session: ${c.typeName}, ${c.min} min`, `When: ${when}`, '', 'The session has not been cancelled. Contact them to rearrange, then update it in your console.'].join('\n');
   return { subject, html, text };
 }
 
@@ -141,4 +180,4 @@ async function sendMail({ to, subject, html, text, replyTo }) {
   }
 }
 
-module.exports = { confirmationEmail, therapistEmail, changeEmail, paymentEmail, sendMail, whenText };
+module.exports = { confirmationEmail, therapistEmail, changeEmail, paymentEmail, reminderEmail, attendEmail, sendMail, whenText };

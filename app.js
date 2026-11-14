@@ -88,7 +88,7 @@ function ensure(d){
   d.connect=d.connect||{gcal:{on:false,email:'',busy:true,write:true,initials:true,cal:'Work',synced:0},wa:{on:false,mode:'',number:'',name:'',auto:true}};
   d.notif=d.notif||{read:{},s:{book:true,cancel:true,wl:true,label:true,noresp:true,daily:true,lock:false,quiet:true}};
   d.clients=d.clients||[];
-  const st=d.settings;if(st.upi==null)st.upi='meeranair@okaxis';if(st.room==null)st.room='meet.google.com/mna-ira-prc';if(st.checkin==null)st.checkin=true;if(st.gapL==null)st.gapL='10 minutes';if(st.plan==null)st.plan='Free';if(st.emailAuto==null)st.emailAuto=true;if(st.videoMode==null)st.videoMode='Same link for everyone';
+  const st=d.settings;if(st.upi==null)st.upi='meeranair@okaxis';if(st.room==null)st.room='meet.google.com/mna-ira-prc';if(st.checkin==null)st.checkin=true;if(st.remind30==null)st.remind30=true;if(st.gapL==null)st.gapL='10 minutes';if(st.plan==null)st.plan='Free';if(st.emailAuto==null)st.emailAuto=true;if(st.videoMode==null)st.videoMode='Same link for everyone';
   d.devices=d.devices||[{id:'d1',name:'Meera’s iPhone',kind:'Practice app for iPhone',push:true,last:Date.now()-20*6e4},{id:'d2',name:'Chrome on MacBook',kind:'Website, this browser',push:true,last:Date.now()}];
   return d}
 function meetCode(id){let h=7;for(const ch of String(id))h=(h*31+ch.charCodeAt(0))>>>0;const L='abcdefghijkmnopqrstuvwxyz';let s='';for(let i=0;i<10;i++){s+=L[h%25];h=Math.floor(h/25);if(h<25)h=(h+1)*977+i*131}return s.slice(0,3)+'-'+s.slice(3,7)+'-'+s.slice(7,10)}
@@ -145,9 +145,9 @@ function pubLoad(){S.pubErr='';
     d.appts=(p.busy||[]).map(([f,t],i)=>({id:'x'+i,name:'',type:d.types[0].id,start:f,dur:Math.round((t-f)/6e4),fee:0,status:'upcoming'}));
     (S.mine||[]).forEach(a=>d.appts.push(a));S.data=ensure(d);
     /* A private link from the confirmation email (?b=…&k=…) opens that booking so the client can move or cancel it. */
-    const q=new URLSearchParams(location.search),mb=q.get('b'),mk=q.get('k');
+    const q=new URLSearchParams(location.search),mb=q.get('b'),mk=q.get('k'),ma=q.get('a');
     if(mb&&mk&&!S.mgTried){S.mgTried=true;return fetch('/api/manage?t='+encodeURIComponent(SLUG)+'&b='+encodeURIComponent(mb)+'&k='+encodeURIComponent(mk)).then(r=>r.json().catch(()=>({}))).then(j=>{
-      if(j&&j.ok&&j.booking){const a=Object.assign({paid:false,waived:false},j.booking);S.mine=[a];S.mg={[a.id]:mk};S.data.appts.push(a);S.c.booked=a.id;S.c.type=a.type;S.c.step='booked'}
+      if(j&&j.ok&&j.booking){const a=Object.assign({paid:false,waived:false},j.booking);S.mine=[a];S.mg={[a.id]:mk};S.data.appts.push(a);S.c.booked=a.id;S.c.type=a.type;S.c.step='booked';if(ma==='yes'||ma==='no')S.c.ask=ma}
       else toast('That link no longer works. You can still book a new time.');S.pubReady=true},()=>{S.pubReady=true})}
     S.pubReady=true})
   .catch(st=>{S.pubErr=st===404?'This booking link is not active. Check the link with your therapist.':'We could not load this page. Check your connection, then try again.'})
@@ -194,7 +194,7 @@ function sbLoad(){
 function sbQueue(){if(!SB||!S.auth||!S.dbReady)return;S.dirty=true;clearTimeout(sbT);sbT=setTimeout(sbFlush,1200)}
 /* What the booking page may show: no client names, only the times that are taken. */
 function pubData(){const d=S.data,s=d.settings;return {profile:d.profile,types:d.types,hours:d.hours,blocks:d.blocks,intake:d.intake,consent:d.consent,
-  settings:{cancelWindow:s.cancelWindow,latePct:s.latePct,minors:s.minors,gapL:s.gapL,checkin:s.checkin,videoMode:s.videoMode,room:s.room,upi:s.upi},
+  settings:{cancelWindow:s.cancelWindow,latePct:s.latePct,minors:s.minors,gapL:s.gapL,checkin:s.checkin,videoMode:s.videoMode,room:s.room,upi:s.upi,remind30:s.remind30!==false},
   busy:d.appts.filter(a=>a.status==='upcoming'&&a.start+a.dur*6e4>Date.now()).map(a=>[a.start,a.start+a.dur*6e4]),tzOff:new Date().getTimezoneOffset()}}
 /* The link's name. It is fixed once the therapist has entered their own name, so shared links keep working. */
 function sbSlug(){const s=S.data.settings;if(s.slug)return s.slug;const named=P().name&&P().name!=='Your name';
@@ -215,7 +215,8 @@ function sbInbox(){if(!SB||!S.auth||!S.dbReady||document.hidden)return Promise.r
   return SB.from('booking_inbox').select('id,kind,payload').is('imported_at',null).order('created_at').then(({data,error})=>{if(error||!data||!data.length)return;
     let n=0;S.inbox=S.inbox||[];
     data.forEach(r=>{const p=r.payload||{};if(!p.id)return;
-      if(r.kind==='payment'){const x=S.data.appts.find(a=>a.id===p.apptId);if(x&&!x.paid){x.payClaim={utr:p.utr||'',at:p.at};n++}}
+      if(r.kind==='attend'){const x=S.data.appts.find(a=>a.id===p.apptId);if(x&&x.status==='upcoming'){x.attend={answer:p.answer==='no'?'no':'yes',at:p.at};n++}}
+      else if(r.kind==='payment'){const x=S.data.appts.find(a=>a.id===p.apptId);if(x&&!x.paid){x.payClaim={utr:p.utr||'',at:p.at};n++}}
       else if(r.kind==='cancel'||r.kind==='reschedule'){const x=S.data.appts.find(a=>a.id===p.apptId);
         /* A change the client made from their private link. Only a session that is still upcoming can be changed. */
         if(x&&x.status==='upcoming'){if(r.kind==='cancel'){cancelAppt(x,p.reason||'Other',p.at);x.cancelledBy='client';n++}else if(x.start!==p.start){x.start=p.start;x.reminded=false;x.movedAt=p.at;x.isNew=true;n++}}}
@@ -372,6 +373,7 @@ function vBooked(){const a=D().appts.find(x=>x.id===S.c.booked);if(!a)return '<p
   return `<div class="sec" style="max-width:680px;gap:18px"><span class="av" style="width:56px;height:56px;font-size:26px">✓</span><h1 style="font-size:${S.device==='phone'?'32px':'40px'}">You’re booked, ${esc(firstName(a.name))}</h1>
   <p class="muted" style="margin:0;font-size:17px;line-height:1.5">${SLUG?(a.mail==='sent'?`A confirmation email is on its way to ${esc(a.email)}. It has a private link to move or cancel this session.`:`${esc(tName(true))} has your booking and will be in touch to confirm.`):`${esc(firstName(P().name))} will confirm on WhatsApp and send a reminder the day before.`}${a.guardian?' She will also contact your parent or guardian for consent.':''}</p>
   <div class="card"><dl class="kv"><dt>Session</dt><dd>${esc(ty.name)}, ${ty.min} min</dd><dt>When</dt><dd>${esc(fDL(a.start))}, ${fT(a.start)}</dd><dt>Where</dt><dd>${videoFor(a)?`Online. Video link: <a href="https://${videoFor(a)}" target="_blank" rel="noopener">${esc(videoFor(a))}</a>`:SLUG&&a.mode!=='In person'?`Online. ${esc(tName(true))} will send the video link before the session.`:esc(P().where.replace(/^Online, and in person in /,''))}</dd><dt>Fee</dt><dd>${money(a.fee)}${SLUG&&s.upi?'. You can pay now (below) or after the session.':', by UPI after the session.'}${SLUG?'':' A payment link comes on WhatsApp.'}</dd>${a.wa?`<dt>WhatsApp</dt><dd>${esc(a.wa)}</dd>`:''}</dl></div>
+  ${SLUG&&a.status==='upcoming'&&(S.mg||{})[a.id]?attendBox(a,c,lateNow):''}
   ${SLUG&&s.upi&&a.status==='upcoming'?payBox(a,s):''}
   ${SLUG&&!(S.mg||{})[a.id]?`<p class="muted" style="margin:0;font-size:14px">To change or cancel, ${a.mail==='sent'?'reply to the confirmation email':'contact '+esc(tName())}. It is free until ${esc(fD(a.start-s.cancelWindow*36e5))}, ${fT(a.start-s.cancelWindow*36e5)}.</p>`:c.cancelAsk?`<div class="panel sec"><b>Cancel this session?</b>${lateNow?`<div class="note warn">It starts in less than ${s.cancelWindow} hours, so a fee of ${money(Math.round(a.fee*s.latePct/100))} applies.</div>`:'<span class="muted">No fee applies.</span>'}
     ${chips('c.cancelReason',REASONS,'Reason, optional')}<div style="display:flex;gap:10px;flex-wrap:wrap"><button class="btn" data-a="clientCancel">Cancel session</button><button class="btn2" data-a="set" data-k="c.cancelAsk" data-v="">Keep it</button></div></div>`
@@ -379,6 +381,11 @@ function vBooked(){const a=D().appts.find(x=>x.id===S.c.booked);if(!a)return '<p
     <p class="muted" style="margin:0;font-size:13px">Free to cancel or move until ${esc(fD(a.start-s.cancelWindow*36e5))}, ${fT(a.start-s.cancelWindow*36e5)}.</p>`}
   ${LIVE?'':'<p class="muted" style="margin:0;font-size:13px">Switch to the Therapist window to see this booking arrive.</p>'}</div>`}
 
+/* The reminder email's question. It only tells the therapist; it never cancels or moves the session. */
+function attendBox(a,c,lateNow){if(a.attend==='yes')return `<div class="note"><b>Thank you.</b><br>${esc(tName(true))} knows you will be there.</div>`;
+  if(a.attend==='no')return `<div class="note warn"><b>${esc(tName(true))} has been told you can’t make it.</b><br>${lateNow?'Because the session is close, it can’t be moved online. They will contact you to rearrange.':'Pick a new time with Reschedule below, or they will contact you.'}</div>`;
+  if(!c.ask)return '';
+  return `<div class="panel sec" style="gap:10px"><b style="font-size:18px">Will you be there at ${fT(a.start)}?</b><div style="display:flex;gap:10px;flex-wrap:wrap"><button type="button" class="btn" data-a="attend" data-v="yes">Yes, I’ll be there</button><button type="button" class="btn2" data-a="attend" data-v="no">I can’t make it</button></div></div>`}
 /* Pay by UPI straight to the therapist. There is no payment company in between: the client pays from their own UPI app, then can tap once to tell the therapist. */
 function payBox(a,s){if(a.claimed)return `<div class="note"><b>Thank you.</b><br>${esc(tName(true))} will mark this paid once it shows in their account.</div>`;
   const link='upi://pay?pa='+encodeURIComponent(s.upi)+'&pn='+encodeURIComponent(P().name&&P().name!=='Your name'?P().name:'Therapist')+'&am='+encodeURIComponent(a.fee)+'&cu=INR&tn='+encodeURIComponent('Session '+fD(a.start));
@@ -638,6 +645,7 @@ function tPayments(){const all=D().appts,now=new Date(),m0=new Date(now.getFullY
 function relTime(t){const m=Math.round((Date.now()-t)/6e4);if(m<1)return 'now';if(m<60)return m+' min ago';const h=Math.round(m/60);if(h<24&&dayStart(t)===T0)return h+' h ago';if(dayStart(t)===T0-DAY||dayStart(t)===addDays(T0,-1))return 'Yesterday';return fD(t)}
 function notifs(){const d=D(),s=d.notif.s,out=[];
   if(s.book)d.appts.filter(a=>a.isNew&&a.status==='upcoming').forEach(a=>out.push({id:'nb'+a.id,at:a.bookedAt||a.consentAt||Date.now()-36e5,title:'New booking',body:`${nm(a.name)} booked a ${typeOf(a.type).name.toLowerCase()} for ${fD(a.start)}, ${fT(a.start)}.${a.guardian?' Under 18: guardian consent needed.':''}`,lock:`New booking for ${fD(a.start)}, ${fT(a.start)}`,go:{ap:a.id}}));
+  d.appts.filter(a=>a.status==='upcoming'&&a.attend&&a.attend.at>Date.now()-DAY).forEach(a=>{const no=a.attend.answer==='no';out.push({id:'at'+a.id+a.attend.at,at:a.attend.at,title:no?'Can’t make it':'Will attend',body:`${nm(a.name)} ${no?'says they can’t make':'confirmed'} ${fD(a.start)}, ${fT(a.start)}.${no?' Contact them to rearrange.':''}`,lock:no?`A client can’t make a session on ${fD(a.start)}`:`A client confirmed ${fD(a.start)}`,go:{ap:a.id}})});
   if(s.cancel)d.appts.filter(a=>a.status==='cancelled'&&a.cancelledAt&&a.cancelledAt>Date.now()-7*DAY).forEach(a=>{const m=d.waitlist.some(w=>wlMatches(w,a.start))&&a.start>Date.now();out.push({id:'cx'+a.id+a.cancelledAt,at:a.cancelledAt,title:a.late?'Late cancellation':'Session cancelled',body:`${nm(a.name)} cancelled ${fD(a.start)}, ${fT(a.start)}.${a.lateFee?' '+money(a.lateFee)+' late fee.':''}${m?' Someone on your waitlist wants this time.':''}`,lock:`A session on ${fD(a.start)} was cancelled${m?'. Waitlist match.':''}`,go:m?{tab:'waitlist'}:{ap:a.id}})});
   if(s.wl)d.waitlist.filter(w=>w.source==='Client page'&&w.joined>Date.now()-7*DAY).forEach(w=>out.push({id:'wl'+w.id,at:w.joined,title:'New on your waitlist',body:`${nm(w.name)} wants ${w.days.toLowerCase()}, ${w.times.toLowerCase()}.`,lock:'Someone joined your waitlist',go:{tab:'waitlist'}}));
   if(s.label){const p=d.appts.filter(needsLabel);if(p.length)out.push({id:'lb'+p.map(a=>a.id).join('-'),at:Math.max(...p.map(a=>a.start+a.dur*6e4)),title:`${p.length} session${p.length===1?' needs':'s need'} a label`,body:'Mark them Completed, No-show or Cancelled so fees and hours stay right.',lock:`${p.length} session${p.length===1?'':'s'} to label`,go:{tab:'insights'}})}
@@ -667,7 +675,7 @@ function waTemplates(){return [{n:'session_reminder',t:'Utility',x:'Hi {{1}}, a 
 function tApps(){const g=D().connect.gcal,w=D().connect.wa;const tg=(path,t,sub,on)=>`<label class="tg"><span>${t}${sub?`<small>${sub}</small>`:''}</span><input type="checkbox" class="tgl" data-f="${path}" ${on?'checked':''}></label>`;
   const next30=D().appts.filter(a=>a.status==='upcoming'&&a.start<Date.now()+30*DAY).length;
   return `<div class="ttl"><div><h1>Connected apps</h1><p>Connect once. The phone app and the website use the same connections.</p></div></div>
-  <section class="panel sec"><h2 class="h2">Email reminders</h2><p class="muted" style="margin:-6px 0 0;font-size:14px">Free on every plan, with no monthly limit. Clients without an email address are skipped.</p><div>${tg('data.settings.emailAuto','Send reminders by email automatically','At 6 pm the day before each session, with the same neutral wording',D().settings.emailAuto)}</div></section>
+  <section class="panel sec"><h2 class="h2">Email reminders</h2><p class="muted" style="margin:-6px 0 0;font-size:14px">Free on every plan, with no monthly limit. Clients without an email address are skipped.</p><div>${tg('data.settings.emailAuto','Send reminders by email automatically','At 6 pm the day before each session, with the same neutral wording',D().settings.emailAuto)}${tg('data.settings.remind30','Remind clients 30 minutes before','Clients who booked from your page get an email with “Yes, I’ll be there” and “Reschedule”. You see their reply on the session.',D().settings.remind30!==false)}</div></section>
   <section class="panel sec"><div class="conn"><span class="logo" aria-hidden="true">31</span><div class="sec" style="gap:4px;flex:1;min-width:0"><h2 class="h2">Google Calendar</h2>
    ${g.on?`<span class="muted" style="font-size:14px">Connected as ${esc(g.email)} · synced ${esc(relTime(g.synced))}</span>`:'<span class="muted" style="font-size:14px">Stops double bookings with the rest of your life, and puts sessions in the calendar you already use.</span>'}</div>
    ${g.on?'<button class="mini w" data-a="gcalOff">Disconnect</button>':'<button class="mini pri" data-a="gcalConnect">Connect</button>'}</div>
@@ -770,6 +778,7 @@ function renderModal(){const m=S.modal,s=D().settings;
     ${a.sup&&!a.supDone?field('supn','What to discuss','data.appts.'+D().appts.indexOf(a)+'.supNote',{type:'long',req:false,ph:'The question you want to bring',hint:'Only you see this. The supervision list shows initials, never full names.'}):''}</div><dl class="kv"><dt>WhatsApp</dt><dd>${esc(S.t.hide?'Hidden':a.wa)}</dd><dt>Email</dt><dd>${esc(S.t.hide?'Hidden':a.email)}</dd><dt>Where</dt><dd>${videoFor(a)?`Online · <a href="https://${videoFor(a)}" target="_blank" rel="noopener">${esc(videoFor(a))}</a>`:'In person'}</dd>
     ${a.checkin?`<dt>Check-in</dt><dd>${m.show?`${a.checkin.score} of 5 · “${esc(a.checkin.note)}”`:`<button class="linkbtn" style="padding:0" data-a="set" data-k="modal.show" data-v="1">🔒 Show answer</button>`}</dd>`:a.status==='upcoming'&&D().settings.checkin?'<dt>Check-in</dt><dd class="muted">Goes out with the reminder</dd>':''}
     ${a.paid?`<dt>Payment</dt><dd>${a.pay?`${esc(a.pay.method)}${a.pay.utr?' · UTR '+esc(a.pay.utr):''} · ${esc(fD(a.pay.at))}`:'No details recorded'} <button class="linkbtn" style="padding:0;font-size:13px" data-a="payEdit" data-id="${a.id}">${a.pay&&a.pay.utr?'Edit':'Add UTR'}</button></dd>`:''}
+    ${a.status==='upcoming'&&a.attend?`<dt>Reminder reply</dt><dd>${a.attend.answer==='no'?'Says they can’t make it. Contact them to rearrange.':'Confirmed they will be there.'}</dd>`:''}
     ${!a.paid&&a.payClaim?`<dt>Payment</dt><dd>Client says they paid${a.payClaim.utr?' · UTR '+esc(a.payClaim.utr):''}. Check your bank, then <button class="linkbtn" style="padding:0;font-size:13px" data-a="apPaid" data-id="${a.id}">Record payment</button></dd>`:''}
     <dt>Booked</dt><dd>${esc(a.source)}</dd>${D().connect.gcal.on&&D().connect.gcal.write&&a.status==='upcoming'?`<dt>Google Calendar</dt><dd>“Session · ${esc(D().connect.gcal.initials?initials(a.name):a.name)}” in ${esc(D().connect.gcal.cal)}</dd>`:''}</dl>${g}${acts}${intake}`)}
   if(m.kind==='offer'){const w=D().waitlist.find(x=>x.id===m.id);if(!w)return '';const sl=m.slot?[Number(m.slot)]:nextFree(w.type,12).filter(t=>wlMatches(w,t)).slice(0,3);const list=sl.length?sl:nextFree(w.type,3);
@@ -832,6 +841,8 @@ function act(a,el){const ds=el.dataset,c=S.c,d=D();if(a!=='calMenu')S.t.calMenu=
   case 'view':S.view=ds.v;S.modal=null;setHash();break;
   case 'device':S.device=ds.v;S.modal=null;if(ds.v==='desktop'&&S.t.tab==='more')S.t.tab='schedule';setHash();break;
   case 'sbretry':if(SB)sbLoad();break;
+  case 'attend':{const b=d.appts.find(x=>x.id===c.booked);if(!b||c.sending)return;c.sending=true;
+    pubManage(b,{action:'attend',answer:ds.v==='no'?'no':'yes'}).then(({st,j})=>{c.sending=false;if(j&&j.ok){b.attend=ds.v==='no'?'no':'yes';c.ask=null;toast(ds.v==='no'?tName(true)+' has been told.':'Thank you.')}else toast(st===409?'This session has already started or was cancelled.':'We could not send that. Try again.');render()}).catch(()=>{c.sending=false;toast('We could not reach the server.');render()});return}
   case 'payClaim':{const b=d.appts.find(x=>x.id===c.booked);const utr='';
     if(c.sending)return;c.sending=true;c.err={};
     pubManage(b,{action:'paid',utr}).then(({st,j})=>{c.sending=false;if(j&&j.ok){b.claimed=true;toast('Thank you. '+tName(true)+' has been told.')}else toast(st===429?'Too many requests just now. Try again in an hour.':'We could not send that. Try again, or tell '+tName()+' directly.');render()})
