@@ -73,8 +73,8 @@ module.exports = async (req, res) => {
     }
     return res.status(400).json({ ok: false });
   } catch (e) {
-    console.error('admin failed', e.code || e.name);
-    return res.status(503).json({ ok: false });
+    console.error('admin failed', e.code || e.name, e.message);
+    return res.status(503).json({ ok: false, code: String(e.code || e.name || '').slice(0, 20) });
   } finally {
     if (client) client.release();
   }
