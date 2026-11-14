@@ -323,7 +323,7 @@ function vIntro(m){const p=P();return `${m?'':''}<div class="${m?'mbody':'cwrap'
     <div class="chips"><span class="pill ok">${esc(p.approach)}</span><span class="pill ok">${esc(p.langs)}</span><span class="pill ok">${esc(p.exp)}</span></div>
     <p class="muted" style="margin:0;font-size:14px">${esc(p.where)}</p>
     ${m?'':`<div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:6px"><button class="btn" data-a="startBook">Book a session</button><button class="btn2" data-a="go" data-v="waitlist">Join the waitlist</button></div>`}
-  </div><div class="portrait" role="img" aria-label="Photo placeholder for ${esc(p.name)}"><span>${ini()}</span><small>Therapist photo</small></div></section>
+  </div><div class="portrait photo"><img src="portrait.jpg" alt="${esc(p.name)}" width="1170" height="845" decoding="async"></div></section>
   <section class="sec"><h2 class="h2">Sessions</h2><div class="types">${D().types.map(t=>`<button class="type" data-a="startBook" data-v="${t.id}"><b>${esc(t.name)}</b><span class="muted" style="font-size:14px;line-height:1.45">${esc(t.desc)}</span><span style="display:flex;justify-content:space-between;align-items:baseline;margin-top:6px"><span class="price">${money(t.fee)}</span><span class="muted" style="font-size:13px">${t.min} min</span></span></button>`).join('')}</div></section>
   <section class="sec" style="gap:0;max-width:760px"><h2 class="h2" style="margin-bottom:6px">Questions people ask</h2>
     ${[['What happens in the first session?','We talk about what brings you here and what you hope will change. You can share as much or as little as you like, and we decide together whether to keep meeting.'],
