@@ -242,6 +242,10 @@ details.faq p{margin:10px 0 0;color:var(--text2);line-height:1.55;max-width:64ch
 /* therapist */
 .tnav{height:56px;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:0 clamp(20px,4cqi,56px);border-bottom:1px solid var(--line)}
 .tnav-r{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+.topsearch{position:relative;margin-left:auto;flex:0 1 260px;min-width:180px}
+.topsearch .in{height:38px;font-size:15px}
+.topres{position:absolute;right:0;top:44px;width:340px;max-height:380px;overflow:auto;background:var(--card);color:var(--text);border:1px solid var(--line);border-radius:12px;padding:6px;z-index:60;box-shadow:0 8px 24px rgba(0,0,0,.12)}
+.topres:empty{display:none}
 .twrap{padding:28px clamp(20px,4cqi,56px) 48px;display:flex;flex-direction:column;gap:20px}
 .tabs-x{overflow-x:auto;padding-bottom:4px;margin-bottom:-4px}
 .tabs{display:inline-flex;gap:2px;padding:3px;border-radius:10px;background:var(--panel)}
