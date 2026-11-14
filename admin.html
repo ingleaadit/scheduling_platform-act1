@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<title>Admin</title>
+<style>
+:root{--bg:#FAFAF9;--card:#FFFFFF;--text:#171717;--muted:#5C625F;--line:#DDDFDC;--accent:#0A0908;--onaccent:#FFFFFF;--warn:#8A4B00;--warnbg:#FFF4E0}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--bg:#121414;--card:#1B1E1D;--text:#F1F1EF;--muted:#A6ABA9;--line:#323736;--accent:#EAE0D5;--onaccent:#171717;--warn:#F2C27B;--warnbg:#2B2112}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+main{max-width:1100px;margin:0 auto;padding:24px 16px 64px}
+h1{font-size:26px;margin:0 0 4px}h2{font-size:18px;margin:28px 0 10px}
+.muted{color:var(--muted)}.small{font-size:13px}
+.top{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:18px}
+button,.btn{font:inherit;border:1px solid var(--line);background:var(--card);color:var(--text);border-radius:10px;padding:8px 14px;cursor:pointer}
+button.pri{background:var(--accent);color:var(--onaccent);border-color:var(--accent)}
+input{font:inherit;color:var(--text);background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 12px;width:100%}
+label{display:block;font-size:13px;color:var(--muted);margin:12px 0 4px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px}
+.signin{max-width:380px;margin:12vh auto 0}
+.note{background:var(--warnbg);color:var(--warn);border-radius:10px;padding:10px 12px;font-size:14px;margin:12px 0}
+.err{color:#C0392B;font-size:14px;margin-top:10px}
+.scroll{overflow-x:auto;border:1px solid var(--line);border-radius:14px;background:var(--card)}
+table{border-collapse:collapse;width:100%;min-width:640px}
+th,td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--line);vertical-align:top;font-size:14px}
+th{font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);font-weight:600}
+tr:last-child td{border-bottom:0}
+tr.row{cursor:pointer}tr.row:hover td{background:color-mix(in srgb,var(--accent) 6%,transparent)}
+.tabs{display:flex;gap:6px;flex-wrap:wrap;margin:14px 0}
+.tabs button.on{background:var(--accent);color:var(--onaccent);border-color:var(--accent)}
+.kv{display:grid;grid-template-columns:max-content 1fr;gap:6px 18px;margin:0}
+.kv dt{color:var(--muted)}.kv dd{margin:0;word-break:break-word}
+pre{white-space:pre-wrap;word-break:break-word;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px;font-size:12.5px;max-height:560px;overflow:auto}
+.pill{display:inline-block;padding:1px 8px;border-radius:99px;border:1px solid var(--line);font-size:12px}
+a{color:inherit}
+</style>
+</head>
+<body>
+<main id="app"><p class="muted">Loading…</p></main>
+<script src="supabase.js"></script>
+<script src="config.js"></script>
+<script>
+(function(){
+'use strict';
+var app=document.getElementById('app'),sb=null,token='',me='',tab='overview';
+try{sb=window.supabase.createClient(window.SUPABASE_URL,window.SUPABASE_PUBLISHABLE_KEY)}catch(e){}
+
+/* Small helper that builds elements, so nothing a therapist or client typed is ever read as HTML. */
+function h(tag,attrs,kids){var e=document.createElement(tag);attrs=attrs||{};Object.keys(attrs).forEach(function(k){if(k==='class')e.className=attrs[k];else if(k.slice(0,2)==='on')e.addEventListener(k.slice(2),attrs[k]);else if(attrs[k]!==false&&attrs[k]!=null)e.setAttribute(k,attrs[k])});
+  (Array.isArray(kids)?kids:[kids]).forEach(function(c){if(c==null||c===false)return;e.appendChild(typeof c==='object'?c:document.createTextNode(String(c)))});return e}
+function put(){app.textContent='';Array.prototype.slice.call(arguments).forEach(function(n){app.appendChild(n)})}
+var fmt=function(t){if(!t&&t!==0)return '';var d=new Date(t);return isNaN(d)?String(t):d.toLocaleString('en-IN',{timeZone:'Asia/Kolkata',day:'numeric',month:'short',year:'numeric',hour:'numeric',minute:'2-digit'})};
+var money=function(n){return '₹'+Number(n||0).toLocaleString('en-IN')};
+
+function api(q){return fetch('/api/admin?'+q,{headers:{Authorization:'Bearer '+token}}).then(function(r){return r.json().catch(function(){return {}}).then(function(j){j.status=r.status;return j})})}
+
+function signin(msg){
+  var em=h('input',{type:'email',autocomplete:'username',placeholder:'you@example.com'}),pw=h('input',{type:'password',autocomplete:'current-password'}),er=h('div',{class:'err'},msg||'');
+  function go(ev){ev.preventDefault();er.textContent='';if(!sb){er.textContent='Sign-in is not available.';return}
+    sb.auth.signInWithPassword({email:em.value.trim(),password:pw.value}).then(function(r){if(r.error||!r.data||!r.data.session){er.textContent='That email and password did not work.';return}token=r.data.session.access_token;list()})}
+  put(h('form',{class:'card signin',onsubmit:go},[h('h1',{},'Admin'),h('p',{class:'muted small'},'Platform owners only.'),h('label',{},'Email'),em,h('label',{},'Password'),pw,h('div',{style:'margin-top:16px'},h('button',{class:'pri',type:'submit'},'Sign in')),er]))}
+
+function top(sub){return h('div',{class:'top'},[h('div',{},[h('h1',{},'Admin'),h('div',{class:'muted small'},sub||me)]),h('div',{},[h('button',{onclick:function(){audit()}},'Access log'),' ',h('button',{onclick:function(){sb.auth.signOut().then(function(){token='';signin()})}},'Sign out')])])}
+
+function list(){
+  api('action=list').then(function(j){
+    if(j.status===401){return signin('Please sign in again.')}
+    if(j.status===403){return put(top(''),h('div',{class:'card'},[h('b',{},'This account is not an admin.'),h('p',{class:'muted'},'Ask the platform owner to add it.')]))}
+    if(!j.ok){return put(top(''),h('div',{class:'err'},'Could not load. Try again in a moment.'))}
+    me=j.me;
+    var rows=j.therapists.map(function(t){return h('tr',{class:'row',tabindex:'0',onclick:function(){view(t.id)},onkeydown:function(e){if(e.key==='Enter')view(t.id)}},[
+      h('td',{},[h('b',{},t.name&&t.name!=='Your name'?t.name:'(no name yet)'),h('div',{class:'muted small'},t.email)]),
+      h('td',{},fmt(t.createdAt)),h('td',{},t.lastSignIn?fmt(t.lastSignIn):'never'),h('td',{},t.savedAt?fmt(t.savedAt):'nothing saved'),
+      h('td',{},String(t.clients)),h('td',{},t.sessions+' ('+t.upcoming+' coming up)'),h('td',{},t.plan||'')])});
+    put(top(j.therapists.length+' therapist account'+(j.therapists.length===1?'':'s')),
+      h('div',{class:'scroll'},h('table',{},[h('thead',{},h('tr',{},['Therapist','Signed up','Last signed in','Last saved','Clients','Sessions','Plan'].map(function(x){return h('th',{},x)}))),h('tbody',{},rows)])),
+      h('p',{class:'muted small'},'Opening a therapist shows their private console data, and each opening is recorded in the access log.'))})}
+
+function audit(){
+  api('action=audit').then(function(j){
+    var rows=(j.entries||[]).map(function(e){return h('tr',{},[h('td',{},fmt(e.at)),h('td',{},e.admin),h('td',{},e.action),h('td',{},e.therapist)])});
+    put(top('Access log'),h('div',{},h('button',{onclick:list},'← All therapists')),h('h2',{},'Every time an account was opened'),
+      h('div',{class:'scroll'},h('table',{},[h('thead',{},h('tr',{},['When','Admin','What','Therapist'].map(function(x){return h('th',{},x)}))),h('tbody',{},rows.length?rows:h('tr',{},h('td',{colspan:'4',class:'muted'},'Nothing yet.'))) ])))})}
+
+function view(id){
+  put(top(''),h('p',{class:'muted'},'Loading…'));
+  api('action=view&id='+encodeURIComponent(id)).then(function(j){
+    if(!j.ok)return put(top(''),h('div',{},h('button',{onclick:list},'← All therapists')),h('div',{class:'err'},'Could not open this account.'));
+    var d=j.data||{},t=j.therapist,appts=(d.appts||[]).filter(function(a){return a&&!/^x\d+$/.test(a.id||'')});
+    var tabs=['overview','clients','sessions','waitlist','settings','raw'];
+    function body(){
+      if(tab==='overview'){
+        var by=function(s){return appts.filter(function(a){return a.status===s}).length};
+        var link=t.slug?location.origin+'/?t='+t.slug:'';
+        var kv=[['Name',(d.profile||{}).name||''],['Email',t.email],['Signed up',fmt(t.createdAt)],['Last signed in',t.lastSignIn?fmt(t.lastSignIn):'never'],['Last saved',t.savedAt?fmt(t.savedAt):'nothing saved'],
+          ['Booking page',link],['Plan',(d.settings||{}).plan||''],['Where',(d.profile||{}).where||''],['Sessions',appts.length+' ('+by('upcoming')+' coming up, '+by('held')+' held, '+by('cancelled')+' cancelled, '+by('noshow')+' no-show)'],
+          ['Waitlist',String((d.waitlist||[]).length)],['Cancellation rule',((d.settings||{}).cancelWindow||'')+' hours, '+((d.settings||{}).latePct||'')+'% fee'],
+          ['Waiting in inbox',(j.inbox||[]).map(function(x){return x.kind+': '+x.n+(x.pending?' ('+x.pending+' not yet copied in)':'')}).join(', ')||'nothing']];
+        var dl=h('dl',{class:'kv'});kv.forEach(function(p){dl.appendChild(h('dt',{},p[0]));dl.appendChild(h('dd',{},p[1]))});return h('div',{class:'card'},dl)}
+      if(tab==='clients'){
+        var seen={},rows=[];(d.clients||[]).forEach(function(c){if(c&&c.name){seen[c.name]=1;rows.push(c)}});appts.forEach(function(a){if(a.name&&!seen[a.name]){seen[a.name]=1;rows.push({name:a.name,wa:a.wa,email:a.email})}});
+        return table(['Name','WhatsApp','Email'],rows.map(function(c){return [c.name,c.wa||'',c.email||'']}))}
+      if(tab==='sessions'){
+        var sorted=appts.slice().sort(function(a,b){return b.start-a.start});
+        return table(['When','Client','Session','Where','Status','Fee','Paid','How it was booked'],sorted.map(function(a){var ty=(d.types||[]).filter(function(x){return x.id===a.type})[0]||{};return [fmt(a.start),a.name,(ty.name||a.type||'')+', '+a.dur+' min',a.mode||'',a.status+(a.attend?' · replied '+a.attend:''),money(a.fee),a.paid?'yes':'no',a.source||'']}))}
+      if(tab==='waitlist')return table(['Name','WhatsApp','Wants','Joined','Source'],(d.waitlist||[]).map(function(w){return [w.name,w.wa||'',[w.days,w.times].filter(Boolean).join(', '),fmt(w.joined),w.source||'']}));
+      if(tab==='settings')return h('pre',{},JSON.stringify({profile:d.profile,settings:d.settings,types:d.types,hours:d.hours,intake:d.intake},null,2));
+      return h('pre',{},JSON.stringify(d,null,2))}
+    function paint(){put(top(''),h('div',{},h('button',{onclick:list},'← All therapists')),h('h2',{},((d.profile||{}).name&&(d.profile||{}).name!=='Your name'?d.profile.name:t.email)),
+      h('div',{class:'note'},'You are looking at this therapist’s private data, including their clients. This opening has been recorded in the access log.'),
+      h('div',{class:'tabs'},tabs.map(function(k){return h('button',{class:tab===k?'on':'',onclick:function(){tab=k;paint()}},k==='raw'?'All data':k[0].toUpperCase()+k.slice(1))})),body())}
+    paint()})}
+
+function table(heads,rows){
+  if(!rows.length)return h('div',{class:'card muted'},'Nothing here.');
+  return h('div',{class:'scroll'},h('table',{},[h('thead',{},h('tr',{},heads.map(function(x){return h('th',{},x)}))),h('tbody',{},rows.map(function(r){return h('tr',{},r.map(function(c){return h('td',{},c==null?'':String(c))}))}))]))}
+
+if(!sb){put(h('div',{class:'err'},'Could not load the sign-in library.'));return}
+/* If this browser is already signed in to the console, that session is reused. */
+sb.auth.getSession().then(function(r){var s=r&&r.data&&r.data.session;if(s){token=s.access_token;list()}else signin()},function(){signin()});
+})();
+</script>
+</body>
+</html>

@@ -551,7 +551,13 @@ function pubLoad(){S.pubErr='';
     /* A private link from the confirmation email (?b=…&k=…) opens that booking so the client can move or cancel it. */
     const q=new URLSearchParams(location.search),mb=q.get('b'),mk=q.get('k'),ma=q.get('a');
     if(mb&&mk&&!S.mgTried){S.mgTried=true;return fetch('/api/manage?t='+encodeURIComponent(SLUG)+'&b='+encodeURIComponent(mb)+'&k='+encodeURIComponent(mk)).then(r=>r.json().catch(()=>({}))).then(j=>{
-      if(j&&j.ok&&j.booking){const a=Object.assign({paid:false,waived:false},j.booking);S.mine=[a];S.mg={[a.id]:mk};S.data.appts.push(a);S.c.booked=a.id;S.c.type=a.type;S.c.step='booked';if(ma==='yes'||ma==='no')S.c.ask=ma}
+      if(j&&j.ok&&j.booking){const a=Object.assign({paid:false,waived:false},j.booking);S.mine=[a];S.mg={[a.id]:mk};S.data.appts.push(a);S.c.booked=a.id;S.c.type=a.type;S.c.step='booked';
+        /* Tapping a button in the reminder email is the answer: no second tap. "Yes" is recorded on arrival, "Reschedule" opens the time picker. */
+        const lateA=a.start-Date.now()<(S.data.settings.cancelWindow||0)*36e5;
+        if(a.status==='upcoming'&&!a.attend&&(ma==='yes'||ma==='no')){
+          if(ma==='yes'||lateA){return pubManage(a,{action:'attend',answer:ma}).then(({j:r})=>{if(r&&r.ok){a.attend=ma;toast(ma==='yes'?'Thank you.':tName(true)+' has been told.')}else S.c.ask=ma}).catch(()=>{S.c.ask=ma}).then(()=>{S.pubReady=true})}
+          S.c.resched=a.id;S.c.slot=null;S.c.day=null;S.c.cancelAsk=false;S.c.step='time'}
+        else if(ma==='yes'||ma==='no')S.c.ask=ma}
       else toast('That link no longer works. You can still book a new time.');S.pubReady=true},()=>{S.pubReady=true})}
     S.pubReady=true})
   .catch(st=>{S.pubErr=st===404?'This booking link is not active. Check the link with your therapist.':'We could not load this page. Check your connection, then try again.'})
@@ -779,10 +785,10 @@ function vBooked(){const a=D().appts.find(x=>x.id===S.c.booked);if(!a)return '<p
   <div class="card"><dl class="kv"><dt>Session</dt><dd>${esc(ty.name)}, ${ty.min} min</dd><dt>When</dt><dd>${esc(fDL(a.start))}, ${fT(a.start)}</dd><dt>Where</dt><dd>${videoFor(a)?`Online. Video link: <a href="https://${videoFor(a)}" target="_blank" rel="noopener">${esc(videoFor(a))}</a>`:SLUG&&a.mode!=='In person'?`Online. ${esc(tName(true))} will send the video link before the session.`:esc(P().where.replace(/^Online, and in person in /,''))}</dd><dt>Fee</dt><dd>${money(a.fee)}${SLUG&&s.upi?'. You can pay now (below) or after the session.':', by UPI after the session.'}${SLUG?'':' A payment link comes on WhatsApp.'}</dd>${a.wa?`<dt>WhatsApp</dt><dd>${esc(a.wa)}</dd>`:''}</dl></div>
   ${SLUG&&a.status==='upcoming'&&(S.mg||{})[a.id]?attendBox(a,c,lateNow):''}
   ${SLUG&&s.upi&&a.status==='upcoming'?payBox(a,s):''}
-  ${SLUG&&!(S.mg||{})[a.id]?`<p class="muted" style="margin:0;font-size:14px">To change or cancel, ${a.mail==='sent'?'reply to the confirmation email':'contact '+esc(tName())}. It is free until ${esc(fD(a.start-s.cancelWindow*36e5))}, ${fT(a.start-s.cancelWindow*36e5)}.</p>`:c.cancelAsk?`<div class="panel sec"><b>Cancel this session?</b>${lateNow?`<div class="note warn">It starts in less than ${s.cancelWindow} hours, so a fee of ${money(Math.round(a.fee*s.latePct/100))} applies.</div>`:'<span class="muted">No fee applies.</span>'}
+  ${SLUG&&!(S.mg||{})[a.id]?`<p class="muted" style="margin:0;font-size:14px">To change or cancel, ${a.mail==='sent'?'reply to the confirmation email':'contact '+esc(tName())}. ${lateNow?`It starts in less than ${s.cancelWindow} hours, so cancelling now costs ${s.latePct}% of the fee.`:`It is free until ${esc(fD(a.start-s.cancelWindow*36e5))}, ${fT(a.start-s.cancelWindow*36e5)}.`}</p>`:c.cancelAsk?`<div class="panel sec"><b>Cancel this session?</b>${lateNow?`<div class="note warn">It starts in less than ${s.cancelWindow} hours, so a fee of ${money(Math.round(a.fee*s.latePct/100))} applies.</div>`:'<span class="muted">No fee applies.</span>'}
     ${chips('c.cancelReason',REASONS,'Reason, optional')}<div style="display:flex;gap:10px;flex-wrap:wrap"><button class="btn" data-a="clientCancel">Cancel session</button><button class="btn2" data-a="set" data-k="c.cancelAsk" data-v="">Keep it</button></div></div>`
   :`<div style="display:flex;gap:10px;flex-wrap:wrap">${SLUG&&lateNow?'':'<button class="btn2" data-a="resched">Reschedule</button>'}<button class="btn2" data-a="set" data-k="c.cancelAsk" data-v="1">Cancel</button></div>
-    <p class="muted" style="margin:0;font-size:13px">Free to cancel or move until ${esc(fD(a.start-s.cancelWindow*36e5))}, ${fT(a.start-s.cancelWindow*36e5)}.</p>`}
+    <p class="muted" style="margin:0;font-size:13px">${lateNow?`It starts in less than ${s.cancelWindow} hours, so cancelling now costs ${s.latePct}% of the fee, and it can’t be moved online.`:`Free to cancel or move until ${esc(fD(a.start-s.cancelWindow*36e5))}, ${fT(a.start-s.cancelWindow*36e5)}.`}</p>`}
   ${LIVE?'':'<p class="muted" style="margin:0;font-size:13px">Switch to the Therapist window to see this booking arrive.</p>'}</div>`}
 
 /* The reminder email's question. It only tells the therapist; it never cancels or moves the session. */
