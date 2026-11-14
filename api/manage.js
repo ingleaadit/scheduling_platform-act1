@@ -43,7 +43,7 @@ module.exports = async (req, res) => {
     if (oldStart <= now) return res.status(409).json({ ok: false, error: 'past' });
     const late = oldStart - now < (Number(s.cancelWindow) || 0) * 36e5;
     const ty = (data.types || []).find((t) => t.id === sum.type) || { id: sum.type, name: 'Session', min: sum.dur, fee: sum.fee };
-    const apptId = 'b' + row.id;
+    const apptId = sum.apptId || 'b' + row.id; // a session the therapist added in the console keeps its own id there
     let mailInfo;
 
     await client.query('begin');

@@ -359,3 +359,42 @@ test('the client answers the reminder; the therapist is told, and only a "no" se
   assert.ok(!row.cancelled_at, 'the session is not cancelled by this');
   global.fetch = realFetch; delete process.env.RESEND_API_KEY; delete process.env.SITE_URL;
 });
+
+// ---- sessions the therapist adds in the console get the same reminder ----
+test('a session the therapist added in the console is reminded too, and the client’s replies reach that same console session', async () => {
+  process.env.SITE_URL = 'https://book.example'; process.env.RESEND_API_KEY = 'k';
+  const sent = []; const realFetch = global.fetch; global.fetch = async (u, o) => { sent.push(JSON.parse(o.body)); return { ok: true, status: 200 }; };
+  const mk = (extra) => Object.assign({ id: 'a' + (Date.now() - 3 * 36e5) + '_0', name: 'Ravi Menon', email: 'Ravi@Example.com', type: 'first', start: Date.now() + 28 * 60000, dur: 60, fee: 1500, status: 'upcoming', mode: 'Online' }, extra);
+  db.inbox = []; db.pub.settings.room = 'meet.example/room';
+  const appt = mk(); db.practiceData = { appts: [appt] };
+  let r = await runRemind();
+  assert.strictEqual(r.body.sent, 1); assert.strictEqual(sent.length, 1);
+  assert.deepStrictEqual(sent[0].to, ['ravi@example.com']);
+  const rec = db.inbox.find((x) => x.kind === 'booking'); assert.ok(rec && rec.imported_at, 'private record exists and the console will not import it'); assert.strictEqual(rec.summary.apptId, appt.id);
+  const yes = sent[0].text.match(/Yes, I'll be there: (\S+)/)[1], u = new URL(yes);
+  const m = { t: u.searchParams.get('t'), b: u.searchParams.get('b'), k: u.searchParams.get('k') };
+  assert.strictEqual((await mgGet(m)).statusCode, 200);
+  assert.strictEqual((await mg(Object.assign({ action: 'attend', answer: 'yes' }, m))).statusCode, 200);
+  assert.strictEqual(db.inbox.find((x) => x.kind === 'attend').payload.apptId, appt.id, 'the reply is addressed to the console’s own session id');
+  // not reminded twice
+  sent.length = 0; r = await runRemind(); assert.strictEqual(sent.length, 0); assert.strictEqual(db.inbox.filter((x) => x.kind === 'booking').length, 1);
+  global.fetch = realFetch; delete process.env.RESEND_API_KEY; delete process.env.SITE_URL; db.practiceData = null;
+});
+test('console sessions without an email, already past, cancelled, too far off or added at short notice get no reminder', async () => {
+  process.env.SITE_URL = 'https://book.example'; process.env.RESEND_API_KEY = 'k';
+  const sent = []; const realFetch = global.fetch; global.fetch = async (u, o) => { sent.push(JSON.parse(o.body)); return { ok: true, status: 200 }; };
+  const old = 'a' + (Date.now() - 3 * 36e5);
+  const base = { name: 'Ravi', email: 'ravi@example.com', type: 'first', dur: 60, fee: 1500, status: 'upcoming', mode: 'Online' };
+  db.inbox = []; db.practiceData = { appts: [
+    Object.assign({}, base, { id: old + '_0', email: '', start: Date.now() + 20 * 60000 }),
+    Object.assign({}, base, { id: old + '_1', start: Date.now() + 90 * 60000 }),
+    Object.assign({}, base, { id: old + '_2', status: 'cancelled', start: Date.now() + 20 * 60000 }),
+    Object.assign({}, base, { id: old + '_3', start: Date.now() - 5 * 60000 }),
+    Object.assign({}, base, { id: 'a' + (Date.now() - 5 * 60000) + '_4', start: Date.now() + 10 * 60000 }),
+  ] };
+  await runRemind(); assert.strictEqual(sent.length, 0);
+  assert.strictEqual(db.inbox.filter((x) => x.remind_sent_at).length, db.inbox.length, 'anything recorded was marked as handled');
+  db.pub.settings.remind30 = false; db.practiceData = { appts: [Object.assign({}, base, { id: old + '_5', start: Date.now() + 20 * 60000 })] }; db.inbox = [];
+  await runRemind(); assert.strictEqual(sent.length, 0, 'switched off'); delete db.pub.settings.remind30;
+  global.fetch = realFetch; delete process.env.RESEND_API_KEY; delete process.env.SITE_URL; db.practiceData = null;
+});

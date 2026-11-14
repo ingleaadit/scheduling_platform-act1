@@ -14,6 +14,12 @@ function makeFakeDb(slug, pid) {
         if (db.limit) return { rows: [db.limit] };
         return { rows: [{ hour_all: db.inbox.length, hour_ip: db.inbox.filter((r) => p[1] && r.ip_hash === p[1] && (r.kind === 'booking' || r.kind === 'waitlist')).length, day_email: db.inbox.filter((r) => r.kind === 'booking' && !r.cancelled_at && p[2] && (r.summary || {}).email === p[2]).length }] };
       }
+      if (/^select d\.practitioner_id, p\.slug, d\.data/.test(sql)) return { rows: db.practiceData && db.pub ? [{ practitioner_id: pid, slug, data: JSON.parse(JSON.stringify(db.practiceData)) }] : [] };
+      if (/^select id from public\.booking_inbox where practitioner_id = \$1 and kind = 'booking' and summary->>'apptId'/.test(sql))
+        return { rows: db.inbox.filter((r) => r.kind === 'booking' && (r.summary || {}).apptId === p[1] && new Date(r.starts_at).getTime() === new Date(p[2]).getTime()).map((r) => ({ id: r.id })) };
+      if (/^insert into public\.booking_inbox \(practitioner_id, kind, starts_at, ends_at, payload, summary, imported_at, created_at\)/.test(sql)) {
+        db.inbox.push({ id: crypto.randomUUID(), kind: 'booking', starts_at: p[1], ends_at: p[2], payload: {}, summary: JSON.parse(p[3]), imported_at: new Date().toISOString(), cancelled_at: null, created_at: p[4] }); return { rows: [] };
+      }
       if (/^select 1 from public\.booking_inbox/.test(sql))
         return { rows: db.inbox.filter((r) => ['booking', 'reschedule'].includes(r.kind) && live(r) && r.starts_at < p[2] && r.ends_at > p[1] && (!p[3] || (r.id !== p[3] && r.booking_id !== p[3]))).map(() => ({})) };
       if (/^insert into public\.booking_inbox/.test(sql)) {
