@@ -189,7 +189,7 @@ function blankData(){const d=seed();
   return d}
 let sbT=null;
 function sbLoad(){
-  S.dbReady=false;S.dbErr='';S.uid=null;
+  S.hist=[];S.dbReady=false;S.dbErr='';S.uid=null;
   return SB.auth.getSession().then(({data})=>{
     const u=data&&data.session&&data.session.user;if(!u)throw new Error('no session');S.uid=u.id;
     return SB.from('practice_data').select('data').eq('practitioner_id',u.id).maybeSingle()})
@@ -233,6 +233,7 @@ function sbInbox(){if(!SB||!S.auth||!S.dbReady||document.hidden)return Promise.r
       else{const list=r.kind==='waitlist'?S.data.waitlist:S.data.appts;if(!list.some(x=>x.id===p.id)){list.push(p);n++}}
       if(!S.inbox.includes(r.id))S.inbox.push(r.id)});
     sbQueue();
+    if(n)S.hist=[];
     if(n){toast(n===1?'New update from your booking page':n+' new updates from your booking page');const tg=(document.activeElement||{}).tagName||'';if(!S.modal&&!/INPUT|TEXTAREA|SELECT/.test(tg))render()}},()=>{})}
 function sbLoadingView(){return `<div class="scr"><div style="padding:48px 28px;display:flex;flex-direction:column;gap:14px;align-items:flex-start"><p class="muted" style="margin:0">${S.dbErr?esc(S.dbErr):'Loading your practice…'}</p>${S.dbErr?'<button type="button" class="btn2" data-a="sbretry">Try again</button> <button type="button" class="linkbtn" data-a="logout" style="padding:0">Log out</button>':''}</div></div>`}
 let S=fresh();
@@ -473,7 +474,7 @@ function signIn(m){const L=S.login;const real=!!SB;
 
 /* ------------- therapist ------------- */
 const TABS=[['schedule','Schedule'],['appts','Appointments'],['insights','Insights'],['payments','Payments'],['waitlist','Waitlist'],['log','Training log'],['messages','Messages'],['hours','Hours'],['profile','Profile'],['apps','Connected apps']];
-const ICON={schedule:'<path d="M7 3v3M17 3v3M4 9h16M5 5h14a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1Z"/>',appts:'<path d="M16 19v-1a4 4 0 0 0-8 0v1M12 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"/>',insights:'<path d="M5 19V11M12 19V5M19 19v-6"/>',messages:'<path d="M5 18l-1 3 4-2h9a3 3 0 0 0 3-3V7a3 3 0 0 0-3-3H7a3 3 0 0 0-3 3v9"/>',more:'<path d="M5 12h.01M12 12h.01M19 12h.01"/>',sessions:'<path d="M9 6h11M9 12h11M9 18h11M4.5 6h.01M4.5 12h.01M4.5 18h.01"/>',payments:'<path d="M5 5h14a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2ZM3 10h18M7 15h3"/>',settings:'<path d="M4 7h9M17 7h3M4 17h3M11 17h9M15 4v6M9 14v6"/>',bell:'<path d="M6 9a6 6 0 1 1 12 0c0 6 2.5 7.5 2.5 7.5h-17S6 15 6 9M10 20a2 2 0 0 0 4 0"/>'};
+const ICON={schedule:'<path d="M7 3v3M17 3v3M4 9h16M5 5h14a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1Z"/>',appts:'<path d="M16 19v-1a4 4 0 0 0-8 0v1M12 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"/>',insights:'<path d="M5 19V11M12 19V5M19 19v-6"/>',messages:'<path d="M5 18l-1 3 4-2h9a3 3 0 0 0 3-3V7a3 3 0 0 0-3-3H7a3 3 0 0 0-3 3v9"/>',more:'<path d="M5 12h.01M12 12h.01M19 12h.01"/>',sessions:'<path d="M9 6h11M9 12h11M9 18h11M4.5 6h.01M4.5 12h.01M4.5 18h.01"/>',payments:'<path d="M5 5h14a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2ZM3 10h18M7 15h3"/>',settings:'<path d="M4 7h9M17 7h3M4 17h3M11 17h9M15 4v6M9 14v6"/>',bell:'<path d="M6 9a6 6 0 1 1 12 0c0 6 2.5 7.5 2.5 7.5h-17S6 15 6 9M10 20a2 2 0 0 0 4 0"/>',undo:'<path d="M9 14 4 9l5-5M4 9h10a6 6 0 0 1 0 12h-3"/>',search:'<circle cx="11" cy="11" r="6"/><path d="m20 20-4.2-4.2"/>',today:'<circle cx="12" cy="12" r="4"/><path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6 7 7M17 17l1.4 1.4M18.4 5.6 17 7M7 17l-1.4 1.4"/>'};
 const icon=k=>`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICON[k]}</svg>`;
 
 function freedBanner(){const f=S.t.freed;if(!f||f.start<Date.now())return '';const ty=f.type;const match=D().waitlist.filter(w=>wlMatches(w,f.start));
@@ -522,7 +523,7 @@ function tSchedule(){const up=D().appts.filter(a=>a.status==='upcoming').sort((a
   ${(()=>{const n=D().appts.filter(a=>a.status==='upcoming'&&a.start+a.dur*6e4>Date.now()).sort((a,b)=>a.start-b.start)[0];if(!n)return '';const v=videoFor(n);const soon=n.start-Date.now()<15*6e4;
     return `<section class="panel" style="display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap"><span><span class="muted" style="font-size:13px">Next session</span><br><b style="font-size:18px">${esc(nm(n.name))} · ${esc(dayStart(n.start)===T0?'Today':fD(n.start))}, ${fT(n.start)}</b><br><span class="muted" style="font-size:14px">${esc(typeOf(n.type).name)} · ${v?'Online':'In person'}${n.checkin?' · check-in answered':''}</span></span>
     <span class="acts">${v?`<a class="${soon?'btn':'btn2'}" style="height:42px;font-size:15px" href="https://${v}" target="_blank" rel="noopener">Join video</a>`:''}<button class="mini w" data-a="openAp" data-id="${n.id}">Details</button></span></section>`})()}
-  ${calendar()}`}
+  ${S.device==='phone'?'':calendar()}`}
 function blockPanel(){const b=S.t.blk;if(!b.date)b.date=String(T0+DAY);return `<section class="panel sec"><h2 class="h2">Block time</h2><p class="muted" style="margin:-6px 0 0;font-size:14px">Blocked times disappear from your booking page straight away.</p>
     <div class="grid4" style="align-items:end"><div class="f"><label for="bd">Day</label><select class="in sm" id="bd" data-f="t.blk.date">${days().map(d=>`<option value="${d}" ${String(d)===String(b.date)?'selected':''}>${esc(fD(d))}</option>`).join('')}</select></div>
     <div class="f"><label for="bf">From</label><select class="in sm" id="bf" data-f="t.blk.from">${TIMES.map(t=>`<option value="${t}" ${t===b.from?'selected':''}>${hmLabel(t)}</option>`).join('')}</select></div>
@@ -532,9 +533,10 @@ function blockPanel(){const b=S.t.blk;if(!b.date)b.date=String(T0+DAY);return `<
     ${D().blocks.length?`<div>${D().blocks.slice().sort((x,y)=>x.date-y.date).map(x=>`<div class="row" style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 0;border-top:1px solid var(--line)"><span>${esc(fD(x.date))}, ${hmLabel(x.from)}–${hmLabel(x.to)}<span class="muted"> · ${esc(x.note||'Blocked')}</span></span><button class="mini w" data-a="delBlock" data-id="${x.id}">Remove</button></div>`).join('')}</div>`:''}
   </section>`}
 
+const phSeg=cur=>S.device==='phone'?`<div class="seg" role="group" aria-label="Clients or sessions" style="align-self:flex-start">${[['people','Clients'],['appts','Sessions']].map(([k,l])=>`<button aria-pressed="${cur===k}" data-a="tab" data-v="${k}">${l}</button>`).join('')}</div>`:'';
 function tAppts(){const f=S.t.apFilter;let list=D().appts.slice();if(f==='upcoming')list=list.filter(a=>a.status==='upcoming').sort((a,b)=>a.start-b.start);else if(f==='past')list=list.filter(a=>a.status!=='upcoming').sort((a,b)=>b.start-a.start);else if(f==='due')list=list.filter(a=>due(a)>0).sort((a,b)=>b.start-a.start);
   return `<div class="ttl"><div><h1>Sessions</h1><p>Tap one to label it, record a payment or see intake answers.</p></div><span class="acts"><button class="btn" data-a="newAp" data-from="cal" style="height:42px;font-size:15px">+ New session</button></span></div>
-  <div class="seg" role="group" aria-label="Filter" style="align-self:flex-start">${[['upcoming','Upcoming'],['past','Past'],['due','Fees due']].map(([k,l])=>`<button aria-pressed="${f===k}" data-a="set" data-k="t.apFilter" data-v="${k}">${l}</button>`).join('')}</div>
+  ${phSeg('appts')}<div class="seg" role="group" aria-label="Filter" style="align-self:flex-start">${[['upcoming','Upcoming'],['past','Past'],['due','Fees due']].map(([k,l])=>`<button aria-pressed="${f===k}" data-a="set" data-k="t.apFilter" data-v="${k}">${l}</button>`).join('')}</div>
   <section class="panel">${f==='clients'?(()=>{const cl=clientList();return cl.length?cl.map(k=>`<div class="crow"><span style="min-width:0"><b style="font-weight:600">${esc(nm(k.name))}</b>${k.ended?' <span class="pill lb-pur"><i></i>Ended</span>':''}<br><span class="muted" style="font-size:13px">${k.held} session${k.held===1?'':'s'} held · ${k.next?'next '+esc(fD(k.next))+', '+fT(k.next):'nothing booked'}${k.due?' · '+money(k.due)+' due':''}</span></span><span class="acts"><button class="mini pri" data-a="newAp" data-from="cal" data-client="${esc(k.name)}">Book</button></span></div>`).join(''):'<p class="muted" style="margin:0">No clients yet. Tap + Add client.</p>'})()
    :list.length?list.map(arow).join(''):'<p class="muted" style="margin:0">Nothing here.</p>'}</section>`}
 function clientList(){const m={};D().appts.forEach(a=>{const c=m[a.name]=m[a.name]||{name:a.name,wa:a.wa,email:a.email,held:0,next:null,due:0,ended:false};if(a.status==='held')c.held++;if(a.status==='upcoming'&&a.start>Date.now()&&(!c.next||a.start<c.next))c.next=a.start;c.due+=due(a);if(a.ended)c.ended=true;if(a.wa&&!c.wa)c.wa=a.wa;if(a.email&&!c.email)c.email=a.email});
@@ -718,7 +720,7 @@ function autoNote(){const w=D().connect.wa,wa=w.on&&w.auto,capped=wa&&!paid()&&w
   return `<div class="note soft">${ch.length?`These go out automatically at 6 pm by ${ch.join(' and ')}, worded as below. You can still send one yourself.`:''}${capped?` This month’s ${WA_CAP} free WhatsApp messages are used${em?', so reminders go by email':''}.`:''}</div>`}
 /* three places: Today, People, Practice */
 const PLACES=[['today','Today',['schedule','notifs']],['people','People',['people','appts','payments','waitlist']],['practice','Settings',['hours','profile','messages','apps','log','insights','more']]];
-const SUBL={people:'Clients',appts:'Sessions',payments:'Payments',waitlist:'Waitlist',hours:'Hours and time off',profile:'Profile and forms',messages:'Messages',apps:'Connected apps',log:'Training log',insights:'Insights',more:'Account'};
+const SUBL={cal:'Calendar',people:'Clients',appts:'Sessions',payments:'Payments',waitlist:'Waitlist',hours:'Hours and time off',profile:'Profile and forms',messages:'Messages',apps:'Connected apps',log:'Training log',insights:'Insights',more:'Account'};
 const PICON={today:'schedule',people:'appts',practice:'insights'};
 const placeOf=tb=>PLACES.find(p=>p[2].includes(tb))||PLACES[0];
 function placeNav(){const pl=placeOf(S.t.tab);return PLACES.map(([k,l,t])=>`<button data-a="tab" data-v="${t[0]}" ${pl[0]===k?'aria-current="page"':''}>${l}</button>`).join('')}
@@ -736,7 +738,7 @@ function peopleRows(q){q=(q||'').trim().toLowerCase();const cl=clientList().filt
   return cl.length?cl.map(k=>`<div class="crow"><button class="linkbtn prow" data-a="person" data-v="${esc(k.name)}"><b>${esc(nm(k.name))}</b>${k.ended?' <span class="pill lb-pur"><i></i>Ended</span>':''}<small>${k.held} session${k.held===1?'':'s'} held · ${k.next?'next '+esc(fD(k.next))+', '+fT(k.next):'nothing booked'}${k.due?' · '+money(k.due)+' due':''}</small></button><span class="acts"><button class="mini pri" data-a="newAp" data-from="cal" data-client="${esc(k.name)}">Book</button></span></div>`).join(''):`<p class="muted" style="margin:0">${q?'No client matches that name.':'No clients yet.'}</p>`}
 function tPeople(){const who=S.t.person,k=who&&clientList().find(x=>x.name===who);
   if(!k)return `<div class="ttl"><div><h1>Clients</h1><p>Everything about a client is on their page.</p></div><span class="acts"><button class="btn2" data-a="import" style="height:42px;font-size:15px">Import clients</button></span></div>
-    <input class="in" id="peopleq" data-f="t.pq" value="${esc(S.t.pq||'')}" placeholder="Search by name" aria-label="Search clients" autocomplete="off">
+    ${phSeg('people')}<input class="in" id="peopleq" data-f="t.pq" value="${esc(S.t.pq||'')}" placeholder="Search by name" aria-label="Search clients" autocomplete="off">
     <section class="panel" id="peoplelist">${peopleRows(S.t.pq)}</section>`;
   const list=D().appts.filter(a=>a.name===k.name).sort((a,b)=>b.start-a.start);const wl=D().waitlist.find(w=>w.name===k.name);const paid=list.filter(a=>a.paid&&a.pay);const first=list.slice().reverse().find(a=>a.intake&&a.intake.length);const owes=list.filter(a=>due(a)>0);const sup=list.filter(a=>a.sup&&!a.supDone).length;
   return `<button class="linkbtn" style="align-self:flex-start;padding:0" data-a="personBack">← All clients</button>
@@ -750,15 +752,19 @@ function findResults(q){q=(q||'').trim().toLowerCase();const cl=clientList().fil
   return (cl.length?`<p class="muted" style="margin:8px 0 0;font-size:13px;font-weight:600">Clients</p>`+cl.map(k=>`<div class="crow"><button class="linkbtn prow" data-a="person" data-v="${esc(k.name)}"><b>${esc(nm(k.name))}</b><small>${k.next?'next '+esc(fD(k.next))+', '+fT(k.next):'nothing booked'}${k.due?' · '+money(k.due)+' due':''}</small></button><span class="acts"><button class="mini pri" data-a="newAp" data-from="cal" data-client="${esc(k.name)}">Book</button></span></div>`).join(''):'')
     +(acts.length?`<p class="muted" style="margin:8px 0 0;font-size:13px;font-weight:600">Add or do</p>`+acts.map(a=>`<div class="crow"><button class="linkbtn prow" data-a="${a[1]}" ${a[1]==='tab'?`data-v="${a[2]}"`:`data-from="${a[2]}"`}><b>${a[0]}</b><small>${a[3]}</small></button></div>`).join(''):'')
     +(!cl.length&&!acts.length?`<p class="muted" style="margin:8px 0">Nothing matches that.</p>`:'')}
-function therBody(){const tb=S.t.tab;if(PAID_TABS[tb]&&!paid())return paywall(tb);return tb==='people'?tPeople():tb==='schedule'?tSchedule():tb==='appts'?tAppts():tb==='insights'?tInsights():tb==='waitlist'?tWaitlist():tb==='log'?tLog():tb==='messages'?tMessages():tb==='hours'?tHours():tb==='profile'?tProfile():tb==='apps'?tApps():tb==='payments'?tPayments():tb==='notifs'?tNotifs():tMore()}
+function tCal(){if(S.device!=='phone')return tSchedule();return `<div class="ttl"><div><h1>Calendar</h1></div></div>${calendar()}`}
+function therBody(){const tb=S.t.tab;if(PAID_TABS[tb]&&!paid())return paywall(tb);return tb==='cal'?tCal():tb==='people'?tPeople():tb==='schedule'?tSchedule():tb==='appts'?tAppts():tb==='insights'?tInsights():tb==='waitlist'?tWaitlist():tb==='log'?tLog():tb==='messages'?tMessages():tb==='hours'?tHours():tb==='profile'?tProfile():tb==='apps'?tApps():tb==='payments'?tPayments():tb==='notifs'?tNotifs():tMore()}
 const SETROWS=()=>[['waitlist','Waitlist',paid()?D().waitlist.length+' waiting':'Paid plan'],['hours','Working hours',''],['profile','Profile and booking page',''],['messages','Messages',''],['apps','Connected apps',[D().connect.gcal.on?'Calendar':'',D().connect.wa.on?'WhatsApp':''].filter(Boolean).join(', ')||'Not set up'],['log','Training log',''],['insights','Insights',paid()?'':'Paid plan']];
 function tMore(){return `<div class="ttl"><div><h1>${S.device==='phone'?'Settings':'Account'}</h1></div></div><div class="mlist">${SETROWS().map(([k,l,x])=>`<button data-a="tab" data-v="${k}"><span>${l}</span><span class="muted">${x} ›</span></button>`).join('')}</div>${planPanel()}<div class="mlist"><button data-a="hide"><span>Hide names</span><span class="muted">${S.t.hide?'On':'Off'}</span></button><button data-a="tourReplay"><span>Take the tutorial again</span><span class="muted">›</span></button><button data-a="logout"><span>Log out</span><span class="muted">›</span></button></div>`}
-function therDesk(){return `<header class="tnav"><b style="font-weight:600">Practice console · ${esc(P().name)}</b><span class="tnav-r"><button class="mini${S.t.tab==='notifs'?' on':''}" data-a="tab" data-v="notifs" aria-label="Notifications, ${unread()} unread">${icon('bell')}${unread()?`<span class="badge">${unread()}</span>`:''}</button><button class="mini" data-a="tourReplay">Tutorial</button><button class="mini${S.t.hide?' on':''}" data-a="hide" aria-pressed="${S.t.hide}">Hide names</button><button class="mini" data-a="previewClient">View my page</button><button class="mini" data-a="logout">Log out</button></span></header>
+function therDesk(){return `<header class="tnav"><b style="font-weight:600">Practice console · ${esc(P().name)}</b><span class="tnav-r">${undoBtn()}${bellBtn()}<button class="mini" data-a="tourReplay">Tutorial</button><button class="mini" data-a="previewClient">View my page</button><button class="mini" data-a="logout">Log out</button></span></header>
   <div class="twrap"><div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;justify-content:space-between"><nav class="tabs places" aria-label="Sections">${placeNav()}</nav><button class="findbtn" data-a="find"><span aria-hidden="true" style="font-size:20px;line-height:1">+</span>Find a client or add something</button></div>${subnav()}${therBody()}</div>`}
-const PH_NAV=[['schedule','Today','schedule'],['people','Clients','appts'],['appts','Sessions','sessions'],['payments','Payments','payments'],['more','Settings','settings']];
-const phGroup=tb=>tb==='notifs'?'schedule':PH_NAV.some(x=>x[0]===tb)?tb:'more';
+const PH_NAV=[['schedule','Today','today'],['cal','Calendar','schedule'],['people','Clients','appts'],['payments','Payments','payments'],['more','Settings','settings']];
+const undoBtn=()=>{const n=(S.hist||[]).length;return `<button class="mini ico${n?'':' dis'}${S.undoPulse&&Date.now()-S.undoPulse<1500?' pulse':''}" data-a="undo" aria-label="Undo last change" ${n?'':'disabled'}>${icon('undo')}</button>`};
+const searchBtn=()=>`<button class="mini ico" data-a="find" aria-label="Search or add">${icon('search')}</button>`;
+const bellBtn=()=>`<button class="mini ico${S.t.tab==='notifs'?' on':''}" data-a="tab" data-v="notifs" aria-label="Notifications, ${unread()} unread">${icon('bell')}${unread()?`<span class="badge">${unread()}</span>`:''}</button>`;
+const phGroup=tb=>tb==='notifs'?'schedule':tb==='appts'?'people':PH_NAV.some(x=>x[0]===tb)?tb:'more';
 function therPhone(){const tb=S.t.tab,g=phGroup(tb);const title=tb==='notifs'?'Notifications':tb==='schedule'?'Today':tb==='more'?'Settings':SUBL[tb]||'Settings';
-  return `<header class="mhead">${g==='more'&&tb!=='more'?`<button class="linkbtn" data-a="tab" data-v="more" style="padding:0;font-size:16px">‹ Settings</button>`:`<b>${esc(title)}</b>`}<span style="display:flex;gap:6px"><button class="mini${tb==='notifs'?' on':''}" data-a="tab" data-v="notifs" aria-label="Notifications, ${unread()} unread">${icon('bell')}${unread()?`<span class="badge">${unread()}</span>`:''}</button><button class="mini${S.t.hide?' on':''}" data-a="hide" aria-pressed="${S.t.hide}">Hide names</button></span></header>
+  return `<header class="mhead">${g==='more'&&tb!=='more'?`<button class="linkbtn" data-a="tab" data-v="more" style="padding:0;font-size:16px">‹ Settings</button>`:`<b>${esc(title)}</b>`}<span style="display:flex;gap:6px">${undoBtn()}${searchBtn()}${bellBtn()}</span></header>
   <div class="scr"><div class="twrap" style="padding:18px 18px 96px">${therBody()}</div></div>
   <button class="fab" data-a="find" aria-label="Find a client or add something">+</button>
   <nav class="tabbar" aria-label="Sections">${PH_NAV.map(([k,l,ic])=>`<button data-a="tab" data-v="${k}" ${g===k?'aria-current="page"':''}>${icon(ic)}${l}</button>`).join('')}</nav>`}
@@ -885,7 +891,11 @@ function renderModal(){const m=S.modal,s=D().settings;
 
 /* ------------- actions ------------- */
 const go=st=>{S.c.step=st;S.c.err={}};
-function act(a,el){const ds=el.dataset,c=S.c,d=D();if(a!=='calMenu')S.t.calMenu=false;
+const NOUNDO=new Set(['tab','find','close','calNav','calView','calDay','calMenu','hide','undo','logout','view','device','reset','fillDemo','tourReplay','tourNext','tourBack','tourSkip','tourSkipPw','tourHours','openAp','person','personBack','sbretry']);
+/* Every change a therapist makes by tapping can be undone: the data before the tap is kept (the last 30). Typing in a field is not recorded here. */
+function act(a,el){const track=!NOUNDO.has(a)&&S.dbReady!==false;const before=track?JSON.stringify(S.data):null;const r=act0(a,el);
+  if(track){try{const now=JSON.stringify(S.data);if(now!==before){S.hist=S.hist||[];S.hist.push(before);if(S.hist.length>30)S.hist.shift();S.undoPulse=Date.now();render()}}catch(e){}}return r}
+function act0(a,el){const ds=el.dataset,c=S.c,d=D();if(a!=='calMenu')S.t.calMenu=false;
   switch(a){
   case 'view':S.view=ds.v;S.modal=null;setHash();break;
   case 'device':S.device=ds.v;S.modal=null;if(ds.v==='desktop'&&S.t.tab==='more')S.t.tab='schedule';setHash();break;
@@ -947,7 +957,7 @@ function act(a,el){const ds=el.dataset,c=S.c,d=D();if(a!=='calMenu')S.t.calMenu=
       return}
     d.waitlist.push({id:'w'+Date.now(),name:w.fn.trim()+' '+w.ln.trim(),wa:'+91 '+w.wa,days:w.days,times:w.times,type:w.type,joined:Date.now(),source:'Client page',offered:null});c.err={};c.wlDone=true;save();break}
   /* therapist */
-  case 'tab':S.t.tab=ds.v;S.modal=null;if(ds.v==='people')S.t.person=null;break;
+  case 'tab':S.t.tab=ds.v;S.modal=null;if(ds.v==='people')S.t.person=null;if(ds.v==='cal'&&!S.t.cal)S.t.cal='day';break;
   case 'person':S.t.person=ds.v;S.t.tab='people';S.modal=null;break;
   case 'personBack':S.t.person=null;break;
   case 'import':S.modal={kind:'import',text:'',err:''};break;
@@ -959,8 +969,9 @@ function act(a,el){const ds=el.dataset,c=S.c,d=D();if(a!=='calMenu')S.t.calMenu=
     save();toast(`${n} client${n===1?'':'s'} added${skip?`, ${skip} line${skip===1?'':'s'} skipped`:''}`);S.modal=null;S.t.tab='people';S.t.person=null;break}
   case 'find':S.modal={kind:'find',q:''};setTimeout(()=>{const i=document.getElementById('findq');if(i)i.focus()},60);break;
   case 'hide':S.t.hide=!S.t.hide;save();break;
+  case 'undo':{const snap=(S.hist||[]).pop();if(snap){S.data=ensure(JSON.parse(snap));S.undoPulse=Date.now();save();toast('Undone')}break}
   case 'previewClient':if(SB){window.open(bookUrl(),'_blank','noopener');break}if(LIVE){window.open('index.html','_blank','noopener');break}S.view='client';S.c=newClient();setHash();break;
-  case 'logout':if(SB){(S.dirty?Promise.race([sbFlush(),new Promise(r=>setTimeout(r,2500))]):Promise.resolve()).then(()=>SB.auth.signOut());S.data=ensure(blankData());S.dbReady=false;S.uid=null}S.auth=false;S.login=newLogin();S.modal=null;S.t.tab='schedule';save();toast('Logged out');break;
+  case 'logout':S.hist=[];if(SB){(S.dirty?Promise.race([sbFlush(),new Promise(r=>setTimeout(r,2500))]):Promise.resolve()).then(()=>SB.auth.signOut());S.data=ensure(blankData());S.dbReady=false;S.uid=null}S.auth=false;S.login=newLogin();S.modal=null;S.t.tab='schedule';save();toast('Logged out');break;
   case 'colours':S.modal={kind:'colours'};break;
   case 'pal':d.settings.palette=ds.v;save();break;
   case 'provider':S.login.note=ds.v+' sign-in isn’t connected in this prototype. Use the demo login below.';S.login.err='';break;
@@ -987,7 +998,7 @@ function act(a,el){const ds=el.dataset,c=S.c,d=D();if(a!=='calMenu')S.t.calMenu=
     const dup=utr&&d.appts.find(y=>y.id!==x.id&&y.pay&&y.pay.utr===utr);if(dup){m.err=`This reference is already recorded for ${nm(dup.name)} on ${fD(dup.pay.at)}. Check it isn’t the same payment.`;break}
     const amount=payAmt(x);x.payClaim=null;x.paid=true;x.pay={amount,method:m.method,utr,from:String(m.from||'').trim(),at:new Date(m.date+'T12:00:00').getTime()||Date.now()};
     S.modal=m.back?{kind:'ap',id:m.back,cancel:false,reason:'',show:false}:null;save();toast(utr||m.method==='Cash'?'Payment recorded':'Payment recorded. Add the reference later from Payments.');break}
-  case 'newAp':{const fromC=ds.from==='clients';const day=ds.day||String(S.t.tab==='schedule'&&S.t.cal==='day'&&S.t.calDate?S.t.calDate:dayStart(Date.now()+3*36e5));const hasC=clientList().length>0;
+  case 'newAp':{const fromC=ds.from==='clients';const day=ds.day||String((S.t.tab==='schedule'||S.t.tab==='cal')&&S.t.cal==='day'&&S.t.calDate?S.t.calDate:dayStart(Date.now()+3*36e5));const hasC=clientList().length>0;
     S.modal={kind:'newAp',from:ds.from||'cal',who:ds.client?'Existing client':(fromC||!hasC)?'New client':'Existing client',client:ds.client||'',fn:'',ln:'',wa:'',email:'',book:!fromC,type:fromC?'first':'follow',mode:'Online',day,time:ds.time||'',repeat:'Does not repeat',count:'4',label:'Confirmed',notify:true,err:{}};break}
   case 'newApSave':{const m=S.modal,e={};let name='',wa='',email='';const isNew=m.who==='New client';
     if(isNew){if(!String(m.fn).trim())e.fn='Enter a first name';if(String(m.wa).replace(/\D/g,'').length!==10)e.wa='Enter a 10-digit WhatsApp number';name=(String(m.fn).trim()+' '+String(m.ln).trim()).trim();wa='+91 '+String(m.wa).trim();email=String(m.email).trim();
@@ -1004,7 +1015,7 @@ function act(a,el){const ds=el.dataset,c=S.c,d=D();if(a!=='calMenu')S.t.calMenu=
     const lab=m.label==='Confirmed'?'confirmed':m.label==='No response'?'noresp':null;const ids=[];
     starts.forEach((s,i)=>{const id='a'+Date.now()+'_'+i;ids.push(id);d.appts.push({id,name,wa,email,type:ty.id,start:s,dur:ty.min,fee:ty.fee,status:'upcoming',paid:false,lateFee:0,late:false,reason:'',waived:false,intake:null,guardian:null,source:'Added by you',reminded:false,mode:m.mode,label:lab})});
     save();toast(ids.length?`${ids.length===1?'Session':ids.length+' sessions'} booked for ${nm(name)}`:`${nm(name)} added to your clients`);
-    if(ids.length&&S.t.tab==='schedule'){S.t.cal='day';S.t.calDate=dayStart(starts[0])}
+    if(ids.length&&(S.t.tab==='schedule'||S.t.tab==='cal')){S.t.cal='day';S.t.calDate=dayStart(starts[0])}
     if(!ids.length){S.t.tab='people';S.t.person=name}
     S.modal=ids.length&&m.notify&&wa&&starts[0]>Date.now()?{kind:'apSent',id:ids[0],n:ids.length,step}:null;break}
   case 'paycsv':if(!paid()){S.t.tab='more';toast('Payments export is on the paid plan');break}S.modal={kind:'paycsv'};break;
