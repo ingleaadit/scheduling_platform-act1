@@ -315,6 +315,7 @@ table.t tr:last-child td{border-bottom:0}
 .mhead{height:52px;flex:none;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:0 18px;border-bottom:1px solid var(--line)}
 .mhead b{font-size:17px}
 .mlist button{width:100%;display:flex;justify-content:space-between;align-items:center;border:0;background:var(--panel);border-radius:16px;padding:16px;font-size:16px;margin-bottom:8px;text-align:left}
+.mlist>div{display:flex;flex-direction:column;gap:2px;background:var(--panel);border-radius:14px;padding:12px 14px;margin-bottom:8px;font-size:15px;text-align:left}
 
 /* modal + toast */
 .ov{inset:0;background:var(--scrim);z-index:40;display:flex;align-items:center;justify-content:center;padding:20px}

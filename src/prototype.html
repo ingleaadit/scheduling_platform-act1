@@ -319,6 +319,7 @@ table.t tr:last-child td{border-bottom:0}
 .mhead{height:52px;flex:none;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:0 18px;border-bottom:1px solid var(--line)}
 .mhead b{font-size:17px}
 .mlist button{width:100%;display:flex;justify-content:space-between;align-items:center;border:0;background:var(--panel);border-radius:16px;padding:16px;font-size:16px;margin-bottom:8px;text-align:left}
+.mlist>div{display:flex;flex-direction:column;gap:2px;background:var(--panel);border-radius:14px;padding:12px 14px;margin-bottom:8px;font-size:15px;text-align:left}
 
 /* modal + toast */
 .ov{inset:0;background:var(--scrim);z-index:40;display:flex;align-items:center;justify-content:center;padding:20px}
@@ -598,7 +599,11 @@ function sbLoad(){
     const u=data&&data.session&&data.session.user;if(!u)throw new Error('no session');S.uid=u.id;
     return SB.from('practice_data').select('data').eq('practitioner_id',u.id).maybeSingle()})
   .then(({data,error})=>{if(error)throw error;
-    S.data=data&&data.data&&data.data.appts?ensure(data.data):ensure(blankData());S.dbReady=true;S.inbox=[];sbQueue();sbInbox()})
+    S.data=data&&data.data&&data.data.appts?ensure(data.data):ensure(blankData());S.dbReady=true;S.inbox=[];
+    /* A therapist signing in for the first time, with nothing in their practice yet, starts with the tutorial. */
+    const nm=String((S.data.profile||{}).name||'').trim();
+    if(!S.data.tourDone&&!(S.data.appts||[]).length&&!(S.data.clients||[]).length&&(!nm||nm==='Your name'))S.modal={kind:'tour',step:0,err:{}};
+    sbQueue();sbInbox()})
   .catch(()=>{S.dbErr='We could not load your data. Check your connection, then try again.'})
   .then(()=>render())}
 function sbQueue(){if(!SB||!S.auth||!S.dbReady)return;S.dirty=true;clearTimeout(sbT);sbT=setTimeout(sbFlush,1200)}
@@ -1152,8 +1157,8 @@ function findResults(q){q=(q||'').trim().toLowerCase();const cl=clientList().fil
     +(!cl.length&&!acts.length?`<p class="muted" style="margin:8px 0">Nothing matches that.</p>`:'')}
 function therBody(){const tb=S.t.tab;if(PAID_TABS[tb]&&!paid())return paywall(tb);return tb==='people'?tPeople():tb==='schedule'?tSchedule():tb==='appts'?tAppts():tb==='insights'?tInsights():tb==='waitlist'?tWaitlist():tb==='log'?tLog():tb==='messages'?tMessages():tb==='hours'?tHours():tb==='profile'?tProfile():tb==='apps'?tApps():tb==='payments'?tPayments():tb==='notifs'?tNotifs():tMore()}
 const SETROWS=()=>[['waitlist','Waitlist',paid()?D().waitlist.length+' waiting':'Paid plan'],['hours','Working hours',''],['profile','Profile and booking page',''],['messages','Messages',''],['apps','Connected apps',[D().connect.gcal.on?'Calendar':'',D().connect.wa.on?'WhatsApp':''].filter(Boolean).join(', ')||'Not set up'],['log','Training log',''],['insights','Insights',paid()?'':'Paid plan']];
-function tMore(){return `<div class="ttl"><div><h1>${S.device==='phone'?'Settings':'Account'}</h1></div></div><div class="mlist">${SETROWS().map(([k,l,x])=>`<button data-a="tab" data-v="${k}"><span>${l}</span><span class="muted">${x} ›</span></button>`).join('')}</div>${planPanel()}<div class="mlist"><button data-a="hide"><span>Hide names</span><span class="muted">${S.t.hide?'On':'Off'}</span></button><button data-a="logout"><span>Log out</span><span class="muted">›</span></button></div>`}
-function therDesk(){return `<header class="tnav"><b style="font-weight:600">Practice console · ${esc(P().name)}</b><span class="tnav-r"><button class="mini${S.t.tab==='notifs'?' on':''}" data-a="tab" data-v="notifs" aria-label="Notifications, ${unread()} unread">${icon('bell')}${unread()?`<span class="badge">${unread()}</span>`:''}</button><button class="mini${S.t.hide?' on':''}" data-a="hide" aria-pressed="${S.t.hide}">Hide names</button><button class="mini" data-a="previewClient">View my page</button><button class="mini" data-a="logout">Log out</button></span></header>
+function tMore(){return `<div class="ttl"><div><h1>${S.device==='phone'?'Settings':'Account'}</h1></div></div><div class="mlist">${SETROWS().map(([k,l,x])=>`<button data-a="tab" data-v="${k}"><span>${l}</span><span class="muted">${x} ›</span></button>`).join('')}</div>${planPanel()}<div class="mlist"><button data-a="hide"><span>Hide names</span><span class="muted">${S.t.hide?'On':'Off'}</span></button><button data-a="tourReplay"><span>Take the tutorial again</span><span class="muted">›</span></button><button data-a="logout"><span>Log out</span><span class="muted">›</span></button></div>`}
+function therDesk(){return `<header class="tnav"><b style="font-weight:600">Practice console · ${esc(P().name)}</b><span class="tnav-r"><button class="mini${S.t.tab==='notifs'?' on':''}" data-a="tab" data-v="notifs" aria-label="Notifications, ${unread()} unread">${icon('bell')}${unread()?`<span class="badge">${unread()}</span>`:''}</button><button class="mini" data-a="tourReplay">Tutorial</button><button class="mini${S.t.hide?' on':''}" data-a="hide" aria-pressed="${S.t.hide}">Hide names</button><button class="mini" data-a="previewClient">View my page</button><button class="mini" data-a="logout">Log out</button></span></header>
   <div class="twrap"><div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;justify-content:space-between"><nav class="tabs places" aria-label="Sections">${placeNav()}</nav><button class="findbtn" data-a="find"><span aria-hidden="true" style="font-size:20px;line-height:1">+</span>Find a client or add something</button></div>${subnav()}${therBody()}</div>`}
 const PH_NAV=[['schedule','Today','schedule'],['people','Clients','appts'],['appts','Sessions','sessions'],['payments','Payments','payments'],['more','Settings','settings']];
 const phGroup=tb=>tb==='notifs'?'schedule':PH_NAV.some(x=>x[0]===tb)?tb:'more';
@@ -1170,7 +1175,46 @@ function therPhoneOld(){const tb=S.t.tab;const cur=['schedule','appts','insights
 
 /* ------------- modals ------------- */
 function sheet(title,sub,body){return `<div class="ov" data-a="closeOv"><div class="sheet" role="dialog" aria-modal="true" aria-label="${esc(title)}" data-stop="1"><div class="sheet-h"><div><h2 class="h2">${esc(title)}</h2>${sub?`<p class="muted" style="margin:4px 0 0;font-size:14px">${sub}</p>`:''}</div><button class="x" data-a="close" aria-label="Close">×</button></div>${body}</div></div>`}
+/* First-login tutorial. It asks the therapist for what only they can decide (fees, sliding scale, rules) and shows where everything lives. */
+const tourSteps=()=>['welcome'].concat(SB?['password']:[],['you','fees','rules','reminders','hours','page','done']);
+const tourTypeIx=id=>D().types.findIndex(t=>t.id===id);
+const REDUCED_DEFAULT={id:'reduced',name:'Reduced-fee session',min:50,fee:700,desc:'A few slots each week for students and anyone who needs it.'};
+function renderTour(m){const steps=tourSteps(),k=steps[m.step]||'welcome',n=steps.length,e=m.err||{},s=D().settings,P_=P();
+  const fee=(id,label,hint)=>{const i=tourTypeIx(id);return i<0?'':field('tf'+id,label,'data.types.'+i+'.fee',{req:false,type:'number',mode:'numeric',pre:'₹',hint,err:e[id]})};
+  const lenSel=(id,label)=>{const i=tourTypeIx(id);if(i<0)return '';const t=D().types[i];return `<div class="f"><label for="tl${id}">${label}</label><select class="in" id="tl${id}" data-f="data.types.${i}.min" data-num="1">${[30,45,50,60,75,90].map(x=>`<option value="${x}" ${x===t.min?'selected':''}>${x} min</option>`).join('')}</select></div>`};
+  const tgl=(path,t,sub,on)=>`<label class="tg"><span>${t}${sub?`<small>${sub}</small>`:''}</span><input type="checkbox" class="tgl" data-f="${path}" ${on?'checked':''}></label>`;
+  let h='',sub='';
+  if(k==='welcome'){h=`<p style="margin:0;line-height:1.6">This takes about two minutes. You will set your fees and rules, and see where everything lives. Everything here can be changed later.</p>
+    <div class="mlist" style="margin-top:6px"><div><span><b>Today</b></span><span class="muted">Your calendar, today’s sessions and anything to clear up</span></div><div><span><b>People</b></span><span class="muted">Your clients and their sessions</span></div><div><span><b>Settings</b></span><span class="muted">Hours, profile and booking page, messages, connected apps, training log</span></div><div><span><b>The bell</b></span><span class="muted">Bookings, cancellations and clients’ replies arrive here</span></div></div>`;sub='Welcome to Practice'}
+  if(k==='password'){h=`<p style="margin:0;line-height:1.6">If someone gave you a password to sign in, choose your own now. Only you should know it.</p>
+    ${field('tpw','New password','modal.pw',{type:'password',hint:'At least 10 characters.',ac:'new-password',err:e.pw})}${field('tpw2','Type it again','modal.pw2',{type:'password',ac:'new-password',err:e.pw2})}
+    <button type="button" class="linkbtn" data-a="tourSkipPw" style="padding:0;align-self:flex-start">I already chose my own password</button>`;sub='Your password'}
+  if(k==='you'){h=`<div class="grid2">${field('tnm','Your name','data.profile.name',{err:e.name,hint:'Shown on your booking page. Your page link is made from it.'})}${field('tti','What you do','data.profile.title',{req:false})}</div>
+    ${field('twh','Where you see clients','data.profile.where',{req:false,hint:'For example: Online, and in person in Indiranagar, Bengaluru.'})}${field('tla','Languages','data.profile.langs',{req:false,hint:'For example: English, Hindi, Kannada.'})}`;sub='About you'}
+  if(k==='fees'){const sl=m.sliding||(tourTypeIx('reduced')>=0?'Yes':'No');m.sliding=sl;if(sl==='Yes'&&tourTypeIx('reduced')<0)D().types.push(m.rbak||Object.assign({},REDUCED_DEFAULT));
+    const ri=tourTypeIx('reduced');
+    h=`<div class="grid2">${fee('first','What do you charge for a first session?')}${lenSel('first','How long is it?')}</div>
+    <div class="grid2">${fee('follow','And for a follow-up session?')}${lenSel('follow','How long is it?')}</div>
+    ${chips('modal.sliding',['Yes','No'],'Do you offer a sliding scale or reduced fees?')}
+    ${sl==='Yes'&&ri>=0?`<div class="panel sec" style="gap:12px"><div class="grid2">${fee('reduced','Your lowest fee')}${field('trd','Who is it for?','data.types.'+ri+'.desc',{req:false,hint:'Clients see this when they book. You decide who gets it.'})}</div></div>`:`<p class="muted" style="margin:0;font-size:14px">Only first and follow-up sessions will show on your page.</p>`}`;sub='Your fees'}
+  if(k==='rules'){h=`<div class="grid2">${field('tcw','Free cancellation, hours before','data.settings.cancelWindow',{req:false,type:'number',mode:'numeric',hint:'Inside this window a late fee applies.'})}${field('tcp','Late cancellation fee, % of the fee','data.settings.latePct',{req:false,type:'number',mode:'numeric'})}</div>
+    ${field('tup','Your UPI ID','data.settings.upi',{req:false,hint:'Clients pay you directly by UPI. Their payment link opens with your ID and the fee filled in. You mark a session paid once it reaches your account.'})}`;sub='Cancellations and payment'}
+  if(k==='reminders'){h=`${tgl('data.settings.remind30','Remind clients 30 minutes before','They get an email with “Yes, I’ll be there” and “Reschedule”. You see their reply in the bell.',s.remind30!==false)}
+    ${field('trm','Your video link','data.settings.room',{req:false,hint:'A Google Meet or Zoom link. It goes in the reminder and on the client’s booking page.'})}
+    <p class="muted" style="margin:0;font-size:14px;line-height:1.5">Reminders go to clients who have an email address, so an email is needed when you book a session for someone.</p>`;sub='Reminders and video'}
+  if(k==='hours'){h=`<p style="margin:0;line-height:1.6">Clients can only book inside your working hours, and never over a session, a break or time you block. Your hours are set to a standard week for now.</p>
+    <div style="display:flex;gap:10px;flex-wrap:wrap"><button type="button" class="btn2" data-a="tourHours">Set my working hours now</button></div><p class="muted" style="margin:0;font-size:14px">You can also do this later in Settings, under Working hours.</p>`;sub='Your working hours'}
+  if(k==='page'){h=`<p style="margin:0;line-height:1.6">This is the link to put on Instagram, WhatsApp or your email signature. Clients book from it, with no account.</p>
+    <div class="panel sec" style="gap:10px"><code id="tourlink" style="font-size:15px;word-break:break-all">${esc(bookUrl())}</code><div><button type="button" class="mini" data-a="copy" data-src="tourlink">Copy link</button></div></div>
+    <p class="muted" style="margin:0;font-size:14px;line-height:1.5">The link is made from your name. Once you have set your name it stays the same, so links you have shared keep working.</p>`;sub='Your booking page'}
+  if(k==='done'){h=`<p style="margin:0;line-height:1.6">You are ready for your first booking. Where to change things later:</p>
+    <div class="mlist"><div><span><b>Fees, sessions, payment, video</b></span><span class="muted">Settings › Profile and booking page</span></div><div><span><b>Hours and breaks</b></span><span class="muted">Settings › Working hours</span></div><div><span><b>Cancellation rule, reminders</b></span><span class="muted">Settings › Profile and booking page</span></div><div><span><b>This tutorial</b></span><span class="muted">The Tutorial button at the top, or Settings on a phone</span></div></div>`;sub='You are set'}
+  const last=m.step===n-1;
+  return `<div class="ov"><div class="sheet" role="dialog" aria-modal="true" aria-label="Getting started" data-stop="1"><div class="sheet-h"><div><h2 class="h2">${esc(sub)}</h2><p class="muted" style="margin:4px 0 0;font-size:14px">Step ${m.step+1} of ${n}</p></div><button class="x" data-a="tourSkip" aria-label="Skip the tutorial">×</button></div>
+    <div class="sec" style="gap:14px">${h}</div>
+    <div class="acts" style="margin-top:6px">${m.step>0?'<button type="button" class="btn2" data-a="tourBack">Back</button>':''}<button type="button" class="btn" data-a="tourNext">${last?'Finish':'Next'}</button>${last?'':'<button type="button" class="linkbtn" data-a="tourSkip" style="padding:0 6px">Skip tutorial</button>'}</div></div></div>`}
 function renderModal(){const m=S.modal,s=D().settings;
+  if(m.kind==='tour')return renderTour(m);
   if(m.kind==='import')return sheet('Import clients','One client per line: name, WhatsApp number, then email if you have it. Paste from a spreadsheet or choose a CSV file.',`${field('imptext','Clients','modal.text',{type:'long',req:false})}<div class="f"><label for="impfile">Or choose a CSV file</label><input class="in" type="file" id="impfile" accept=".csv,.txt,text/csv" style="padding:10px"></div>${m.err?`<div class="note warn">${esc(m.err)}</div>`:''}<p class="muted" style="margin:0;font-size:13px">Example: Asha Menon, 9876543210, asha@example.com. Clients you already have are skipped. In this prototype nothing leaves your browser.</p><button class="btn" data-a="importSave">Add these clients</button>`);
   if(m.kind==='find')return sheet('Find or add','Type a client’s name, or what you want to do.',`<input class="in" id="findq" data-f="modal.q" value="${esc(m.q||'')}" placeholder="A name, or “block”, “payment”, “waitlist”" autocomplete="off" aria-label="Find a client or add something"><div id="findres">${findResults(m.q)}</div>`);
   if(m.kind==='ap'){const a=D().appts.find(x=>x.id===m.id);if(!a)return '';const ty=typeOf(a.type);
@@ -1417,6 +1461,22 @@ function act(a,el){const ds=el.dataset,c=S.c,d=D();if(a!=='calMenu')S.t.calMenu=
   case 'qMove':{const i=Number(ds.i),j=i+Number(ds.v);if(j<0||j>=d.intake.length)return;const t=d.intake[i];d.intake[i]=d.intake[j];d.intake[j]=t;save();break}
   case 'copy':{const src=document.getElementById(ds.src);if(!src)return;const txt=src.value!=null&&src.tagName==='TEXTAREA'?src.value:src.textContent;
     try{navigator.clipboard.writeText(txt).then(()=>toast('Copied'),()=>{selectEl(src);toast('Selected. Press Ctrl or ⌘ + C to copy.')})}catch(e){selectEl(src);toast('Selected. Press Ctrl or ⌘ + C to copy.')}return}
+  case 'tourBack':{const m=S.modal;if(m&&m.step>0){m.step--;m.err={}}break}
+  case 'tourSkipPw':{const m=S.modal;m.pw='';m.pw2='';m.err={};m.step++;break}
+  case 'tourSkip':{d.tourDone=Date.now();S.modal=null;save();toast('You can take the tutorial again in Settings.');break}
+  case 'tourHours':{d.tourDone=Date.now();S.modal=null;S.t.tab='hours';save();toast('Set your hours here. The tutorial is under Settings if you want it again.');break}
+  case 'tourReplay':{S.modal={kind:'tour',step:0,err:{}};break}
+  case 'tourNext':{const m=S.modal,steps=tourSteps(),k=steps[m.step],e={};
+    if(k==='password'){if(m.busy)return;const a=String(m.pw||''),b=String(m.pw2||'');if(a.length<10)e.pw='Use at least 10 characters';else if(a!==b)e.pw2='The two passwords don’t match';
+      if(Object.keys(e).length){m.err=e;break}
+      m.busy=true;m.err={};SB.auth.updateUser({password:a}).then(({error})=>{m.busy=false;if(error){m.err={pw:'Could not set the password. Try a different one, or sign in again.'}}else{m.pw='';m.pw2='';m.step++;toast('Password set')}render()}).catch(()=>{m.busy=false;m.err={pw:'We could not reach the server. Try again.'};render()});break}
+    if(k==='you'){const nmv=String(P().name||'').trim();if(!nmv||nmv==='Your name')e.name='Enter your name';}
+    if(k==='fees'){['first','follow','reduced'].forEach(id=>{const i=tourTypeIx(id);if(i<0)return;if(id==='reduced'&&m.sliding==='No')return;const f=D().types[i].fee;if(f===''||!(Number(f)>=0))e[id]='Enter an amount, or 0 if it is free'});
+      if(!Object.keys(e).length){const ri=tourTypeIx('reduced');if(m.sliding==='No'&&ri>=0)m.rbak=D().types.splice(ri,1)[0]}}
+    if(Object.keys(e).length){m.err=e;break}
+    m.err={};
+    if(m.step>=steps.length-1){d.tourDone=Date.now();S.modal=null;save();toast('All set. Welcome to Practice.');break}
+    m.step++;save();break}
   case 'close':S.modal=null;break;
   case 'closeOv':S.modal=null;break;
   default:return}
