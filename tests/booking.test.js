@@ -136,11 +136,13 @@ test('one visitor is limited to a few requests an hour, others are not affected'
   assert.ok(db.inbox.every((r) => !/203\.0\.113/.test(r.ip_hash || '')), 'address is stored only as a hash');
   db.pub.hours[1] = [['10:00', '13:00']];
 });
-test('the same email cannot hold more than three new bookings a day', async () => {
+test('the same email cannot hold more than five active bookings a day, and cancelled ones do not count', async () => {
   db.inbox = []; db.pub.hours[1] = [['07:00', '22:00']];
   const codes = [];
-  for (let i = 0; i < 4; i++) codes.push((await post(Object.assign(good(), { start: START - 4 * 36e5 + i * 36e5 }), '192.0.2.' + i)).statusCode);
-  assert.deepStrictEqual(codes, [200, 200, 200, 429]);
+  for (let i = 0; i < 6; i++) codes.push((await post(Object.assign(good(), { start: START - 4 * 36e5 + i * 36e5 }), '192.0.2.' + i)).statusCode);
+  assert.deepStrictEqual(codes, [200, 200, 200, 200, 200, 429]);
+  db.inbox.forEach((r) => { r.cancelled_at = new Date().toISOString(); });
+  assert.strictEqual((await post(Object.assign(good(), { start: START + 6 * 36e5 }), '192.0.2.77')).statusCode, 200, 'cancelled bookings free the allowance');
   db.pub.hours[1] = [['10:00', '13:00']];
 });
 test('a therapist-wide hourly cap stops a flood from many addresses', async () => {

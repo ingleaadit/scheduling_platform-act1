@@ -19,6 +19,8 @@ const fontLink = (src.slice(0, cssStart).match(/<link rel="stylesheet"[^>]*>/) |
 fs.copyFileSync('node_modules/@supabase/supabase-js/dist/umd/supabase.js', 'supabase.js');
 const authScripts = '<script src="supabase.js"></script>\n<script src="config.js"></script>\n';
 
+const crypto = require('crypto');
+const VER = crypto.createHash('sha1').update(css + js + body).digest('hex').slice(0, 10);
 const page = (side, title) => `<!doctype html>
 <html lang="en">
 <head>
@@ -30,7 +32,7 @@ ${fontLink}
 </head>
 <body>
 ${body}
-${side === 'therapist' ? authScripts : ''}<script>window.APP_SIDE='${side}'</script>
+${side === 'therapist' ? authScripts : ''}<script>window.APP_SIDE='${side}';window.APP_V='${VER}'</script>
 <script src="app.js"></script>
 </body>
 </html>
@@ -40,4 +42,5 @@ fs.writeFileSync('app.css', css);
 fs.writeFileSync('app.js', js);
 fs.writeFileSync('index.html', page('client', 'Book a session'));
 fs.writeFileSync('console.html', page('therapist', 'Practice console'));
+fs.writeFileSync('version.json', JSON.stringify({ v: VER }) + '\n');
 console.log('Built app.css, app.js, index.html, console.html');

@@ -361,7 +361,7 @@ function vAbout(){const e=S.c.err,s=D().settings;let out='';
   });
   return out+crisis()}
 
-function vConfirm(){const c=S.c,ty=typeOf(c.type);return `<div class="card sec" style="gap:8px"><b style="font-size:17px">${esc(ty.name)} with ${esc(P().name)}</b><span>${esc(fDL(c.slot))}, ${fT(c.slot)} · ${ty.min} min · ${money(ty.fee)}</span><span class="muted" style="font-size:14px">For ${esc(c.d.fn+' '+c.d.ln)} · +91 ${esc(c.d.wa)}</span></div>
+function vConfirm(){const c=S.c,ty=typeOf(c.type);return `${c.fail?`<div class="note warn" role="alert"><b>This booking did not go through.</b><br>${esc(c.fail)}</div>`:''}<div class="card sec" style="gap:8px"><b style="font-size:17px">${esc(ty.name)} with ${esc(P().name)}</b><span>${esc(fDL(c.slot))}, ${fT(c.slot)} · ${ty.min} min · ${money(ty.fee)}</span><span class="muted" style="font-size:14px">For ${esc(c.d.fn+' '+c.d.ln)} · +91 ${esc(c.d.wa)}</span></div>
   ${!needIntake()?`<p class="muted" style="margin:0;font-size:15px;line-height:1.5">You can cancel or move this session for free up to ${D().settings.cancelWindow} hours before it starts. After that, ${D().settings.latePct}% of the fee applies.</p>`:`<div class="sec" style="gap:10px"><h2 class="h2" style="font-size:20px">Informed consent and cancellation policy</h2><div class="policy" tabindex="0" aria-label="Policy text">${policyHtml()}</div>
   <label class="check" for="agree"><input type="checkbox" id="agree" data-f="c.agree" ${c.agree?'checked':''}><span>I have read and agree to the terms and conditions. <span class="req" aria-hidden="true">*</span></span></label>${c.err.agree?`<span class="err">${esc(c.err.agree)}</span>`:''}</div>`}`}
 function policyHtml(){return pol(D().consent).split(/\n\n+/).map(b=>{const lines=b.split('\n');let h='';if(lines[0].startsWith('## ')){h=`<h4>${esc(lines.shift().slice(3))}</h4>`}return h+(lines.length?`<p>${esc(lines.join(' '))}</p>`:'')}).join('')}
@@ -860,13 +860,13 @@ function act(a,el){const ds=el.dataset,c=S.c,d=D();if(a!=='calMenu')S.t.calMenu=
   case 'book':{if(needIntake()&&!c.agree){c.err={agree:'Tick the box to agree before confirming'};render();focusErr();return}const ty=typeOf(c.type);
     if(d.appts.some(x=>x.status==='upcoming'&&x.start===c.slot)){toast('That time was just taken. Pick another.');go('time');c.slot=null;break}
     if(SLUG){if(c.sending)return;c.sending=true;toast('Booking your session…');
-      pubPost({kind:'booking',fn:c.d.fn,ln:c.d.ln,email:c.d.email,wa:c.d.wa,type:ty.id,start:c.slot,mode:c.mode||'Online',answers:needIntake()?c.a:{},guardian:needIntake()&&minor()?c.g:null,agree:needIntake()?true:undefined,hp:c.d.hp,follow:!needIntake()})
+      c.fail='';pubPost({kind:'booking',fn:c.d.fn,ln:c.d.ln,email:c.d.email,wa:c.d.wa,type:ty.id,start:c.slot,mode:c.mode||'Online',answers:needIntake()?c.a:{},guardian:needIntake()&&minor()?c.g:null,agree:needIntake()?true:undefined,hp:c.d.hp,follow:!needIntake()})
       .then(({st,j})=>{c.sending=false;
         if(j&&j.ok&&j.appt){if(c.remember)meSave(c.d);else meClear();if(j.room)D().settings.room=j.room;j.appt.mail=j.mail;D().appts.push(j.appt);(S.mine=S.mine||[]).push(j.appt);if(j.manage)(S.mg=S.mg||{})[j.appt.id]=j.manage.k;c.booked=j.appt.id;go('booked');toast('Booked');render()}
         else if(st===409){toast('That time was just taken. Pick another.');c.slot=null;go('time');pubLoad()}
-        else if(st===429){toast('Too many requests just now. Try again in an hour, or contact '+tName()+'.');render()}
-        else{toast('We could not book that. Check your details and try again.');render()}})
-      .catch(()=>{c.sending=false;toast('We could not reach the server. Check your connection and try again.');render()});
+        else if(st===429){c.fail='There have been several bookings from this email or network today, so this one was stopped. Please try again later, or contact '+tName()+' directly.';render();window.scrollTo(0,0)}
+        else{c.fail='Something went wrong on our side, and nothing was booked. Check your details and try again, or contact '+tName()+' directly.';render();window.scrollTo(0,0)}})
+      .catch(()=>{c.sending=false;c.fail='We could not reach the server, so nothing was booked. Check your connection and try again.';render();window.scrollTo(0,0)});
       return}
     const b={id:'a'+Date.now(),name:(c.d.fn.trim()+' '+c.d.ln.trim()),wa:'+91 '+c.d.wa.trim(),email:c.d.email.trim(),type:ty.id,start:c.slot,dur:ty.min,fee:ty.fee,status:'upcoming',paid:false,lateFee:0,late:false,reason:'',waived:false,
       intake:d.intake.map(q=>({label:q.label,answer:String(c.a[q.id]==null?'':c.a[q.id]),private:!!q.private})).filter(q=>q.answer),guardian:minor()?Object.assign({},c.g):null,consentAt:needIntake()?Date.now():null,bookedAt:Date.now(),mode:c.mode||'Online',source:'Client page',reminded:false,isNew:true};
@@ -1029,4 +1029,17 @@ if(SB){S.auth=false;
 }
 if(SLUG)pubLoad();
 readHash();render();
+// Update check: a page left open (or a Home Screen icon) keeps running the code it loaded. Look for a newer build
+// now and then; reload when that is safe, otherwise show a bar so nothing the person is typing is lost.
+function updBusy(){try{if(S.dirty)return true;if(document.querySelector('.modal,[role="dialog"]'))return true;if(S.c&&S.c.step&&!['intro','booked'].includes(S.c.step))return true}catch(e){}return false}
+async function chkVersion(){if(!window.APP_V||document.hidden)return;
+  try{const r=await fetch('version.json?'+Date.now(),{cache:'no-store'});if(!r.ok)return;const j=await r.json();if(!j.v||j.v===window.APP_V)return;
+    if(!updBusy()){location.reload();return}
+    if(document.getElementById('updbar'))return;const d=document.createElement('div');d.id='updbar';d.setAttribute('role','status');
+    d.style.cssText='position:fixed;left:12px;right:12px;bottom:calc(84px + env(safe-area-inset-bottom));z-index:60;background:var(--ink,#1b1d1c);color:var(--bg,#fff);padding:12px 14px;border-radius:12px;display:flex;gap:12px;align-items:center;justify-content:space-between;font:15px/1.3 inherit;box-shadow:0 4px 18px rgba(0,0,0,.35)';
+    d.innerHTML='<span>A newer version is ready.</span><button type="button" style="font:inherit;font-weight:600;padding:8px 14px;border-radius:10px;border:0;cursor:pointer">Update now</button>';
+    d.querySelector('button').onclick=()=>location.reload();document.body.appendChild(d)}catch(e){}}
+setInterval(chkVersion,180000);document.addEventListener('visibilitychange',chkVersion);window.addEventListener('pageshow',e=>{if(e.persisted)chkVersion()});
+window.__chkVersion=chkVersion;
+
 })();

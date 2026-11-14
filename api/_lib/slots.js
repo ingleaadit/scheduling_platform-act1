@@ -28,11 +28,11 @@ function ipHash(req, pid) {
 async function overLimit(client, pid, ip, email) {
   const r = await client.query(
     `select count(*) filter (where created_at > now() - interval '1 hour') as hour_all,
-            count(*) filter (where created_at > now() - interval '1 hour' and ip_hash = $2) as hour_ip,
-            count(*) filter (where created_at > now() - interval '1 day' and kind = 'booking' and summary->>'email' = $3) as day_email
+            count(*) filter (where created_at > now() - interval '1 hour' and ip_hash = $2 and kind in ('booking','waitlist')) as hour_ip,
+            count(*) filter (where created_at > now() - interval '1 day' and kind = 'booking' and cancelled_at is null and summary->>'email' = $3) as day_email
        from public.booking_inbox where practitioner_id = $1 and created_at > now() - interval '1 day'`, [pid, ip, email || '']);
   const c = r.rows[0] || {};
-  return Number(c.hour_all) >= 40 || (ip && Number(c.hour_ip) >= 6) || (email && Number(c.day_email) >= 3);
+  return Number(c.hour_all) >= 40 || (ip && Number(c.hour_ip) >= 6) || (email && Number(c.day_email) >= 5);
 }
 
 // The site's own address for links in emails. Never taken from the request, which a sender could forge.
