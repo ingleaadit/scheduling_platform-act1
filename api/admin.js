@@ -5,8 +5,9 @@
 const { getPool } = require('./_lib/db');
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
-const SB_URL = () => process.env.SUPABASE_URL || 'https://bpkisvfrhjesumnavvet.supabase.co';
-const SB_KEY = () => process.env.SUPABASE_PUBLISHABLE_KEY || 'sb_publishable_t6IulDmRu24ew0HgCyfu4w_bWcNb7K4'; // public, the same key the browser uses
+// Fixed on purpose: a SUPABASE_URL set in Vercel's environment can hold a database connection string instead of the web address.
+const SB_URL = () => 'https://bpkisvfrhjesumnavvet.supabase.co';
+const SB_KEY = () => 'sb_publishable_t6IulDmRu24ew0HgCyfu4w_bWcNb7K4'; // public, the same key the browser uses (config.js)
 
 async function signedInUser(req) {
   const m = /^Bearer (\S{20,4000})$/.exec(String((req.headers || {}).authorization || ''));
@@ -73,8 +74,8 @@ module.exports = async (req, res) => {
     }
     return res.status(400).json({ ok: false });
   } catch (e) {
-    console.error('admin failed', e.code || e.name, e.message);
-    return res.status(503).json({ ok: false, code: String(e.code || e.name || '').slice(0, 20), msg: String(e.message || '').slice(0, 120) });
+    console.error('admin failed', e.code || e.name);
+    return res.status(503).json({ ok: false, code: String(e.code || e.name || '').slice(0, 20) });
   } finally {
     if (client) client.release();
   }
