@@ -6,7 +6,7 @@ const path = require('path');
 const PID = '24ad3bf8-e9b0-4686-876c-b32e0a1bc7d4';
 const DAY = 864e5;
 // Next Monday 11:00 India time, as epoch ms.
-function nextMonday11() { let t = Date.now() + DAY; for (;;) { const d = new Date(t + 330 * 60000); if (d.getUTCDay() === 1) { d.setUTCHours(11, 0, 0, 0); return d.getTime() - 330 * 60000; } t += DAY; } }
+function nextMonday11() { let t = Date.now() + 2 * DAY; for (;;) { const d = new Date(t + 330 * 60000); if (d.getUTCDay() === 1) { d.setUTCHours(11, 0, 0, 0); return d.getTime() - 330 * 60000; } t += DAY; } }
 const START = nextMonday11();
 function practice() {
   return { profile: { name: 'Asha Rao', where: 'Online' }, types: [{ id: 'first', name: 'First session', min: 60, fee: 1500 }, { id: 'follow', name: 'Follow-up session', min: 50, fee: 1500 }],

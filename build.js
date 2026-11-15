@@ -42,5 +42,6 @@ fs.writeFileSync('app.css', css);
 fs.writeFileSync('app.js', js);
 fs.writeFileSync('index.html', page('client', 'Book a session'));
 fs.writeFileSync('console.html', page('therapist', 'Practice console'));
+fs.writeFileSync('demo.html', page('demo', 'Demo: practice console'));
 fs.writeFileSync('version.json', JSON.stringify({ v: VER }) + '\n');
 console.log('Built app.css, app.js, index.html, console.html');

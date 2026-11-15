@@ -542,6 +542,8 @@ const PALS=[
   {id:'ember',name:'Ember',l:'#540B0E',d:'#FFF3B0'}];
 
 const LIVE=window.APP_SIDE==='client'||window.APP_SIDE==='therapist'?window.APP_SIDE:'';
+/* /demo: the whole app with example data and no account. Opens as the therapist, already signed in. Nothing is sent or saved on a server. */
+const DEMO=window.APP_SIDE==='demo';
 /* Real sign-in (deployed console only). Everywhere else the prototype keeps its demo login. */
 const HASH0=location.hash;
 const FROM_LINK=/type=(invite|recovery)/.test(HASH0)&&/access_token=/.test(HASH0);
@@ -647,7 +649,7 @@ function sbInbox(){if(!SB||!S.auth||!S.dbReady||document.hidden)return Promise.r
     if(n){toast(n===1?'New update from your booking page':n+' new updates from your booking page');const tg=(document.activeElement||{}).tagName||'';if(!S.modal&&!/INPUT|TEXTAREA|SELECT/.test(tg))render()}},()=>{})}
 function sbLoadingView(){return `<div class="scr"><div style="padding:48px 28px;display:flex;flex-direction:column;gap:14px;align-items:flex-start"><p class="muted" style="margin:0">${S.dbErr?esc(S.dbErr):'Loading your practice…'}</p>${S.dbErr?'<button type="button" class="btn2" data-a="sbretry">Try again</button> <button type="button" class="linkbtn" data-a="logout" style="padding:0">Log out</button>':''}</div></div>`}
 let S=fresh();
-try{S.auth=localStorage.getItem(KEY+'-auth')==='1'}catch(e){}
+try{const av=localStorage.getItem(KEY+'-auth');S.auth=av===null?DEMO:av==='1'}catch(e){S.auth=DEMO}
 try{const raw=localStorage.getItem(KEY);if(raw){const p=JSON.parse(raw);if(p&&p.data&&p.data.appts&&p.v===1){S.data=ensure(p.data);if(p.t)Object.assign(S.t,p.t)}}}catch(e){}
 function save(){if(SLUG)return;if(SB){sbQueue();return}try{localStorage.setItem(KEY,JSON.stringify({v:1,data:S.data,t:{freed:S.t.freed,hide:S.t.hide}}));localStorage.setItem(KEY+'-auth',S.auth?'1':'0')}catch(e){}}
 function applyPal(){const p=PALS.find(x=>x.id==='inksand');let css='';
@@ -871,7 +873,7 @@ function signIn(m){const L=S.login;const real=!!SB;
     ${L.mode==='setpw'?`${field('lp','New password','login.pw',{type:'password',req:false,ac:'new-password',hint:'At least 10 characters'})}${field('lp2','Repeat password','login.pw2',{type:'password',req:false,ac:'new-password'})}
       ${L.err?`<span class="err" role="alert">${esc(L.err)}</span>`:''}<button type="submit" class="btn full" ${L.busy?'disabled':''}>${L.busy?'Saving…':'Save password'}</button>`:L.mode==='email'?`${field('le','Email','login.email',{type:'email',req:false,ac:'username',ph:'you@example.com'})}${field('lp','Password','login.pw',{type:'password',req:false,ac:'current-password'})}
       ${L.err?`<span class="err" role="alert">${esc(L.err)}</span>`:''}<button type="submit" class="btn full" ${L.busy?'disabled':''}>${L.busy?'Signing in…':'Sign in'}</button>
-      <div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap"><button type="button" class="linkbtn" style="padding:0" data-a="forgot">Forgot password?</button>${real?'':`<button type="button" class="linkbtn" style="padding:0" data-a="lmode" data-v="phone">Use phone number instead</button>`}</div>`
+      <div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap"><button type="button" class="linkbtn" style="padding:0" data-a="forgot">Forgot password?</button>${real?'':`<button type="button" class="linkbtn" style="padding:0" data-a="lmode" data-v="phone">Use phone number instead</button>`}</div>${real?'<a class="linkbtn" href="demo" style="padding:0;align-self:flex-start">Just looking? Try the demo, no account needed</a>':''}`
     :`${field('lph','Mobile number','login.phone',{type:'tel',mode:'numeric',req:false,pre:'+91',ac:'tel-national'})}${L.sent?field('lotp','6-digit code','login.otp',{mode:'numeric',req:false,ac:'one-time-code',hint:'Sent by SMS to +91 '+L.phone}):''}
       ${L.err?`<span class="err" role="alert">${esc(L.err)}</span>`:''}<button type="submit" class="btn full">${L.sent?'Verify and sign in':'Send code'}</button>
       <button type="button" class="linkbtn" style="padding:0;align-self:flex-start" data-a="lmode" data-v="email">Use email and password instead</button>`}
@@ -1514,7 +1516,7 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape'&&S.modal){S.modal=nu
 
 /* hash routing */
 function setHash(){if(LIVE)return;const h=S.view+'-'+S.device;if(location.hash!=='#'+h){try{history.replaceState(null,'','#'+h)}catch(e){location.hash=h}}}
-function readHash(){if(LIVE){S.view=LIVE;S.device=window.innerWidth<700?'phone':'desktop';return}const m=/^#(client|therapist)-(desktop|phone)$/.exec(location.hash);if(m){S.view=m[1];S.device=m[2]}else{S.device=window.innerWidth<640?'phone':'desktop'}}
+function readHash(){if(LIVE){S.view=LIVE;S.device=window.innerWidth<700?'phone':'desktop';return}const m=/^#(client|therapist)-(desktop|phone)$/.exec(location.hash);if(m){S.view=m[1];S.device=m[2]}else{S.device=window.innerWidth<640?'phone':'desktop';if(DEMO)S.view='therapist'}}
 window.addEventListener('hashchange',()=>{readHash();S.modal=null;render()});
 if(LIVE){document.body.classList.add('live');document.getElementById('livebar').hidden=!!SB||!!SLUG;if(LIVE==='therapist'&&!SB)document.getElementById('livereset').hidden=false;
   window.addEventListener('resize',()=>{const dv=window.innerWidth<700?'phone':'desktop';if(dv!==S.device){S.device=dv;S.modal=null;render()}});
