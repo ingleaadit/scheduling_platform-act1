@@ -2,7 +2,20 @@
   "dependencies": {
     "@supabase/ssr": "^0.12.7",
     "@supabase/supabase-js": "^2.119.0",
-    "nodemailer": "^6.9.16",
+    "nodemailer": "^10.5.0",
     "pg": "^8.23.1"
+  },
+  "scripts": {
+    "build": "node build.js",
+    "test": "node --test tests/booking.test.js tests/admin.test.js tests/db-health.test.js",
+    "test:e2e": "node tests/e2e/run.js",
+    "test:all": "npm test && npm run test:e2e"
+  },
+  "devDependencies": {
+    "axe-core": "4.14.0",
+    "playwright": "1.63.0"
+  },
+  "engines": {
+    "node": ">=20"
   }
 }

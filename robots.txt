@@ -1,0 +1,5 @@
+User-agent: *
+Disallow: /console
+Disallow: /admin
+Disallow: /api/
+Sitemap: https://schedulingplatform-act1.vercel.app/sitemap.xml

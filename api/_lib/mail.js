@@ -147,8 +147,13 @@ function smtpTransport() {
   smtp = { key: process.env.SMTP_USER + '|' + process.env.SMTP_PASS, t };
   return t;
 }
+// One plain address only: letters, digits and . _ % + ' - before the @, a normal domain after it.
+// No quotes, spaces, commas, semicolons or angle brackets, so a typed address cannot turn into several recipients.
+const ADDR = /^[A-Za-z0-9._%+'-]{1,64}@[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,24}$/;
+function isEmail(x) { return typeof x === 'string' && x.length <= 254 && ADDR.test(x); }
 async function sendMail({ to, subject, html, text, replyTo }) {
   if (!to) return 'skipped';
+  if (!isEmail(to) || (replyTo && !isEmail(replyTo))) { console.error('mail refused: not a plain address'); return 'failed'; }
   if (process.env.SMTP_USER && process.env.SMTP_PASS) {
     try {
       const t = (module.exports._transport || smtpTransport)();
@@ -180,4 +185,4 @@ async function sendMail({ to, subject, html, text, replyTo }) {
   }
 }
 
-module.exports = { confirmationEmail, therapistEmail, changeEmail, paymentEmail, reminderEmail, attendEmail, sendMail, whenText };
+module.exports = { isEmail, confirmationEmail, therapistEmail, changeEmail, paymentEmail, reminderEmail, attendEmail, sendMail, whenText };

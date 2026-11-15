@@ -39,13 +39,14 @@ async function handler(req, res) {
   }
   if (!connectionString()) {
     res.statusCode = 500;
-    return res.end('No database connection string is configured');
+    res.setHeader('content-type', 'application/json');
+    return res.end(JSON.stringify({ ok: false }));
   }
   try {
-    const r = await getPool().query('select now() as server_time');
+    await getPool().query('select 1');
     res.setHeader('content-type', 'application/json');
     res.statusCode = 200;
-    return res.end(JSON.stringify({ ok: true, server_time: r.rows[0].server_time }));
+    return res.end(JSON.stringify({ ok: true }));
   } catch (e) {
     // Log the error class only: driver messages can echo connection details.
     // Also log whether the CA variable is present (true/false only, never its value).

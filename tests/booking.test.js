@@ -398,3 +398,19 @@ test('console sessions without an email, already past, cancelled, too far off or
   await runRemind(); assert.strictEqual(sent.length, 0, 'switched off'); delete db.pub.settings.remind30;
   global.fetch = realFetch; delete process.env.RESEND_API_KEY; delete process.env.SITE_URL; db.practiceData = null;
 });
+
+test('only plain single email addresses are accepted', () => {
+  const { isEmail } = require('../api/_lib/mail');
+  for (const ok of ['a@b.com', 'first.last+tag@mail.example.co.in', "o'brien@x.org", 'a_b-c@sub.domain.in']) assert.strictEqual(isEmail(ok), true, ok);
+  for (const bad of ['a@b', 'a b@c.com', 'a@b.com,c@d.com', 'a@b.com;c@d.com', '"a>b"@c.com', 'a@b.com>', '<a@b.com>', 'x"y@c.com', 'a@@b.com', '@b.com', 'a@b..com', '', 'a@b.c', 'a@b.com\nbcc:x@y.com', 'A'.repeat(65) + '@b.com', 'a@' + 'b'.repeat(250) + '.com']) assert.strictEqual(isEmail(bad), false, JSON.stringify(bad));
+  assert.strictEqual(isEmail(null), false); assert.strictEqual(isEmail(undefined), false);
+});
+
+test('a booking with a sneaky email address is refused and nothing is stored', async () => {
+  db.inbox = []; db.pub = practice();
+  for (const email of ['a@b.com,c@d.com', '"x y"@z.com', 'a@b.com>', 'a@b.com;c@d.com']) {
+    const r = await post(Object.assign(good(), { email }));
+    assert.strictEqual(r.statusCode, 400, email);
+    assert.strictEqual(db.inbox.length, 0);
+  }
+});

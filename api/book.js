@@ -2,13 +2,13 @@
 // Everything is checked again here; nothing the browser sends is trusted (fee and length come from the therapist's own settings).
 const crypto = require('crypto');
 const { getPool } = require('./_lib/db');
-const { confirmationEmail, therapistEmail, sendMail } = require('./_lib/mail');
+const { isEmail, confirmationEmail, therapistEmail, sendMail } = require('./_lib/mail');
 
 const { DAY, str, sha, slotAllowed, ipHash, overLimit, siteUrl, therapistLabel } = require('./_lib/slots');
 
 function buildBooking(data, body) {
   const fn = str(body.fn, 60), ln = str(body.ln, 60), email = str(body.email, 120), wa = str(body.wa, 20).replace(/\D/g, '');
-  if (!fn || !ln || !/^\S+@\S+\.\S+$/.test(email) || wa.length !== 10) return { error: 'details' };
+  if (!fn || !ln || !isEmail(email) || wa.length !== 10) return { error: 'details' };
   const ty = (data.types || []).find((t) => t.id === body.type);
   const start = Number(body.start);
   if (!ty || !Number.isFinite(start)) return { error: 'details' };

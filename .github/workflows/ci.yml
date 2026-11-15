@@ -1,0 +1,29 @@
+name: CI
+on:
+  push:
+    branches: [main]
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Built files are up to date
+        run: |
+          node build.js
+          git diff --exit-code -- app.css app.js index.html console.html demo.html version.json supabase.js
+      - name: Dependency audit
+        run: npm audit --omit=dev --audit-level=high
+      - name: Unit tests
+        run: npm test
+      - run: npx playwright install --with-deps chromium
+      - name: Browser tests
+        run: npm run test:e2e
