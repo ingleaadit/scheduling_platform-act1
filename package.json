@@ -6,10 +6,10 @@
     "pg": "^8.23.1"
   },
   "scripts": {
-    "build": "node build.js",
     "test": "node --test tests/booking.test.js tests/admin.test.js tests/db-health.test.js",
     "test:e2e": "node tests/e2e/run.js",
-    "test:all": "npm test && npm run test:e2e"
+    "test:all": "npm test && npm run test:e2e",
+    "make": "node build.js"
   },
   "devDependencies": {
     "axe-core": "4.14.0",
