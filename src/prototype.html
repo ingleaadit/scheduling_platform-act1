@@ -292,6 +292,26 @@ details.faq p{margin:10px 0 0;color:var(--text2);line-height:1.55;max-width:64ch
 .ttl p{margin:6px 0 0;color:var(--text2);font-size:17px}
 .arow{width:100%;text-align:left;border:0;background:none;display:grid;grid-template-columns:118px minmax(0,1fr) auto auto;gap:14px;align-items:center;padding:12px 0;border-bottom:1px solid var(--line)}
 .arow:last-child{border-bottom:0}
+:root{--ty0:#3F8A63;--ty1:#C9812B;--ty2:#4F78C4;--ty3:#9B62B0;--ty4:#C2605A}
+.arow,.ev,.tl{box-shadow:inset 4px 0 0 var(--ty,transparent)}
+.arow{padding-left:12px}
+.tl{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;padding:12px 12px 12px 14px;border-bottom:1px solid var(--line)}
+.tl:last-child{border-bottom:0}
+.tl .main{flex:1 1 230px;min-width:0;border:0;background:none;color:inherit;text-align:left;display:flex;gap:14px;align-items:center;padding:0}
+.tl .t{width:76px;flex:none;font-weight:600;font-variant-numeric:tabular-nums}
+.tl small{display:block;font-size:13px;color:var(--text2);margin-top:2px}
+.tl.next{background:var(--soft);border-radius:12px;border-bottom:0}
+.tl.done{opacity:.62}
+.avg{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px;max-width:420px}
+.avg .avh{font-size:12px;color:var(--text2);text-align:center;padding-bottom:2px}
+.avd{height:44px;border-radius:12px;border:1px solid transparent;background:none;font-size:15px;color:var(--text2);display:flex;align-items:center;justify-content:center}
+button.avd{background:var(--soft);color:var(--text);font-weight:600}
+button.avd:hover{border-color:var(--accent)}
+.avd.off{opacity:.35}
+.avd.now{text-decoration:underline;text-underline-offset:4px}
+.feedh{font-size:12px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.07em;margin:16px 0 2px}
+.payrow{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:11px 0 11px 12px;border-bottom:1px solid var(--line);font-size:14px;color:var(--text2)}
+.payrow b{color:var(--text);font-variant-numeric:tabular-nums}
 .arow small{display:block;font-size:13px;color:var(--text2);margin-top:2px}
 .arow b{font-weight:600}
 .arow .fee{font-size:14px;color:var(--text2);text-align:right;font-variant-numeric:tabular-nums;min-width:84px}
@@ -299,7 +319,7 @@ details.faq p{margin:10px 0 0;color:var(--text2);line-height:1.55;max-width:64ch
 .wday{background:var(--panel);border-radius:14px;padding:12px;display:flex;flex-direction:column;gap:8px;min-width:0;min-height:150px}
 .wday h4{margin:0;font-size:13px;color:var(--text2);font-weight:600}
 .wday.today h4{color:var(--accent)}
-.ev{border:0;text-align:left;background:var(--card);border-radius:12px;padding:8px 10px;font-size:13px;line-height:1.3;width:100%}
+.ev{border:0;text-align:left;background:var(--card);border-radius:12px;padding:8px 10px 8px 13px;font-size:13px;line-height:1.3;width:100%}
 .ev b{display:block;font-size:13px}
 .ev.blk{background:transparent;border:1px dashed var(--line);color:var(--text2)}
 .bar{display:grid;grid-template-columns:130px minmax(0,1fr) 28px;gap:12px;align-items:center;font-size:14px}
@@ -660,6 +680,7 @@ function applyPal(){const p=PALS.find(x=>x.id==='inksand');let css='';
 function swatches(){const cur=S.data.settings.palette||'neem';return `<div class="sws" role="group" aria-label="Colour scheme">${PALS.map(p=>`<button type="button" class="swt${p.id===cur?' on':''}" data-a="pal" data-v="${p.id}" aria-pressed="${p.id===cur}"><span class="dots" aria-hidden="true"><span class="dot" style="background:${p.l}"></span><span class="dot dk" style="background:${p.h||p.d}"></span></span><b style="font-weight:600">${p.name}</b></button>`).join('')}</div>`}
 const D=()=>S.data;
 const typeOf=id=>D().types.find(t=>t.id===id)||D().types[0];
+const tyS=id=>'--ty:var(--ty'+(Math.max(0,D().types.findIndex(t=>t.id===id))%5)+')';
 const nm=n=>S.t.hide?initials(n):n;
 const P=()=>D().profile;
 const ini=()=>P().name.split(/\s+/).map(w=>w[0]).join('').slice(0,2).toUpperCase();
@@ -747,6 +768,7 @@ function vIntro(m){const p=P();return `${m?'':''}<div class="${m?'mbody':'cwrap'
     <p class="muted" style="margin:0;font-size:14px">${esc(p.where)}</p>
     ${m?'':`<div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:6px"><button class="btn" data-a="startBook">Book a session</button><button class="btn2" data-a="go" data-v="waitlist">Join the waitlist</button></div>`}
   </div><div class="portrait photo"><img src="portrait.jpg" alt="${esc(p.name)}" width="1170" height="845" decoding="async"></div></section>
+  ${availGrid()}
   <section class="sec"><h2 class="h2">Sessions</h2><div class="types">${D().types.map(t=>`<button class="type" data-a="startBook" data-v="${t.id}"><b>${esc(t.name)}</b><span class="muted" style="font-size:14px;line-height:1.45">${esc(t.desc)}</span><span style="display:flex;justify-content:space-between;align-items:baseline;margin-top:6px"><span class="price">${money(t.fee)}</span><span class="muted" style="font-size:13px">${t.min} min</span></span></button>`).join('')}</div></section>
   <section class="sec" style="gap:0;max-width:760px"><h2 class="h2" style="margin-bottom:6px">Questions people ask</h2>
     ${[['What happens in the first session?','We talk about what brings you here and what you hope will change. You can share as much or as little as you like, and we decide together whether to keep meeting.'],
@@ -758,6 +780,11 @@ function vIntro(m){const p=P();return `${m?'':''}<div class="${m?'mbody':'cwrap'
       .map(([q,a])=>`<details class="faq"><summary>${esc(q)}</summary><p>${esc(a)}</p></details>`).join('')}
   </section>${m?crisis():''}</div>`}
 
+function availGrid(){const ty=D().types[0];if(!ty)return '';const off=(new Date(T0).getDay()+6)%7;let cells='',any=false;
+  for(let i=-off;i<14||(i+off)%7!==0;i++){const d=T0+i*DAY,dn=new Date(d).getDate(),n=i>=0&&i<14?slotsFor(d,ty.min).length:0;
+    if(n){any=true;cells+=`<button class="avd${i===0?' now':''}" data-a="startBook" data-v="${ty.id}" data-day="${d}" aria-label="${esc(fDL(d))}, ${n} time${n===1?'':'s'} open">${dn}</button>`}
+    else cells+=`<span class="avd${i<0||i>=14?' off':''}${i===0?' now':''}"${i>=0&&i<14?` aria-label="${esc(fDL(d))}, full"`:' aria-hidden="true"'}>${dn}</span>`}
+  return `<section class="sec" style="gap:12px"><h2 class="h2">Open days</h2>${any?`<p class="muted" style="margin:0;font-size:14px">Highlighted days have a time free in the next two weeks. Tap one to see the times.</p><div class="avg" role="group" aria-label="Open days">${['M','T','W','T','F','S','S'].map(x=>`<span class="avh" aria-hidden="true">${x}</span>`).join('')}${cells}</div>`:'<p class="muted" style="margin:0">No open times in the next two weeks.</p>'}</section>`}
 function vTime(){const c=S.c,ty=typeOf(c.type),ds=days();
   if(c.day==null||!slotsFor(c.day,ty.min).length){const f=ds.find(d=>slotsFor(d,ty.min).length);c.day=f==null?ds[0]:f}
   const sl=slotsFor(c.day,ty.min);
@@ -894,14 +921,14 @@ function freedBanner(){const f=S.t.freed;if(!f||f.start<Date.now())return '';con
   <span class="acts">${match.length?`<button class="mini pri" data-a="offer" data-id="${match[0].id}" data-slot="${f.start}">Offer to ${esc(nm(match[0].name))}</button>`:''}<button class="mini w" data-a="tab" data-v="waitlist">See waitlist</button><button class="mini w" data-a="dismissFreed">Dismiss</button></span></div>`}
 function wlMatches(w,t){const d=new Date(t),wd=d.getDay(),h=d.getHours();const dayOk=w.days==='Any day'||(w.days==='Weekdays'&&wd>=1&&wd<=5)||(w.days==='Saturdays'&&wd===6)||(w.days==='Thursdays'&&wd===4);const tOk=w.times==='Any time'||(w.times==='Mornings'&&h<12)||(w.times==='Afternoons'&&h>=12&&h<17)||(w.times==='Evenings after 6'&&h>=18);return dayOk&&tOk}
 
-function arow(a){const ty=typeOf(a.type);return `<button class="arow" data-a="openAp" data-id="${a.id}"><span class="when"><b>${fT(a.start)}</b><small>${esc(fD(a.start))}</small></span><span class="who"><b>${esc(nm(a.name))}</b><small>${esc(ty.name)}${a.source==='Client page'?' · booked online':''}${a.sup&&!a.supDone?' · <b style="color:var(--lb-pur-i);font-weight:600">For supervision</b>':''}</small></span>${pill(a)}<span class="fee">${feeLabel(a)}</span></button>`}
+function arow(a){const ty=typeOf(a.type);return `<button class="arow" style="${tyS(a.type)}" data-a="openAp" data-id="${a.id}"><span class="when"><b>${fT(a.start)}</b><small>${esc(fD(a.start))}</small></span><span class="who"><b>${esc(nm(a.name))}</b><small>${esc(ty.name)}${a.source==='Client page'?' · booked online':''}${a.sup&&!a.supDone?' · <b style="color:var(--lb-pur-i);font-weight:600">For supervision</b>':''}</small></span>${pill(a)}<span class="fee">${feeLabel(a)}</span></button>`}
 
 /* calendar views */
 const addDays=(t,n)=>{const d=new Date(t);d.setDate(d.getDate()+n);d.setHours(0,0,0,0);return d.getTime()};
 const weekStart=t=>{const d=new Date(t);d.setDate(d.getDate()-((d.getDay()+6)%7));d.setHours(0,0,0,0);return d.getTime()};
 const calEvs=d=>D().appts.filter(a=>dayStart(a.start)===d).sort((a,b)=>a.start-b.start);
 function evCls(a){const id=labelOf(a);if(needsLabel(a)&&id!=='checkedin')return 'ev-warn';if(!id)return a.isNew?'lb-acc':'';return lbl(id).cls+(id==='cancelled'?' ev-x':'')}
-function evBtn(a,style){return `<button class="ev ${evCls(a)}" data-a="openAp" data-id="${a.id}" ${style?`style="${style}"`:''}><b>${fT(a.start)}</b>${esc(nm(a.name))}<span style="display:block;font-size:12px;opacity:.85">${esc(labelName(a))}</span></button>`}
+function evBtn(a,style){return `<button class="ev ${evCls(a)}" data-a="openAp" data-id="${a.id}" style="${tyS(a.type)}${style?';'+style:''}"><b>${fT(a.start)}</b>${esc(nm(a.name))}<span style="display:block;font-size:12px;opacity:.85">${esc(labelName(a))}</span></button>`}
 function weekCol(d){const list=calEvs(d),bl=allBlocks(d),dt=new Date(d);
   return `<div class="wday${d===T0?' today':''}"><h4><button class="linkbtn" style="padding:0;font-size:13px;font-weight:600;color:inherit" data-a="calDay" data-v="${d}">${d===T0?'Today':dt.toLocaleDateString('en-IN',{weekday:'short'})} ${dt.getDate()}</button></h4>${list.map(a=>evBtn(a)).join('')}${bl.map(x=>`<div class="ev blk"><b>${hmLabel(x.from)}–${hmLabel(x.to)}</b>${esc(x.note||'Blocked')}</div>`).join('')}${!list.length&&!bl.length?`<span class="muted" style="font-size:13px">${(D().hours[dt.getDay()]||[]).length?'Free':'Not working'}</span>`:''}</div>`}
 function dayView(d){const H0=8,H1=21,PX=60;const evs=calEvs(d),bl=allBlocks(d),wh=D().hours[new Date(d).getDay()]||[];
@@ -930,9 +957,10 @@ function tSchedule(){const up=D().appts.filter(a=>a.status==='upcoming').sort((a
   const totalDue=D().appts.reduce((s,a)=>s+due(a),0);const wk=Array.from({length:7},(_,i)=>T0+i*DAY);const b=S.t.blk;if(!b.date)b.date=String(T0+DAY);
   const h=new Date().getHours();const hello=h<12?'Good morning':h<17?'Good afternoon':'Good evening';
   return `<div class="ttl"><div><p class="muted" style="margin:0 0 2px;font-size:14px">${esc(fDL(T0))}</p><h1>${hello}</h1><p>${today.length?today.length+' session'+(today.length>1?'s':'')+' today':'No sessions today'} · ${up.length} coming up · ${money(totalDue)} due</p></div></div>
+  ${todayTimeline()}
   ${todoQueue()}
   ${(()=>{const n=0;return n?`<div class="note warn" style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap"><span><b>${n} past session${n===1?' needs':'s need'} a label.</b> Mark them Completed, No-show or Cancelled.</span><button class="mini w" data-a="tab" data-v="insights">Label them</button></div>`:''})()}
-  ${(()=>{const n=D().appts.filter(a=>a.status==='upcoming'&&a.start+a.dur*6e4>Date.now()).sort((a,b)=>a.start-b.start)[0];if(!n)return '';const v=videoFor(n);const soon=n.start-Date.now()<15*6e4;
+  ${(()=>{const n=D().appts.filter(a=>a.status==='upcoming'&&a.start+a.dur*6e4>Date.now()).sort((a,b)=>a.start-b.start)[0];if(!n||calEvs(T0).length)return '';const v=videoFor(n);const soon=n.start-Date.now()<15*6e4;
     return `<section class="panel" style="display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap"><span><span class="muted" style="font-size:13px">Next session</span><br><b style="font-size:18px">${esc(nm(n.name))} · ${esc(dayStart(n.start)===T0?'Today':fD(n.start))}, ${fT(n.start)}</b><br><span class="muted" style="font-size:14px">${esc(typeOf(n.type).name)} · ${v?'Online':'In person'}${n.checkin?' · check-in answered':''}</span></span>
     <span class="acts">${v?`<a class="${soon?'btn':'btn2'}" style="height:42px;font-size:15px" href="https://${v}" target="_blank" rel="noopener">Join video</a>`:''}<button class="mini w" data-a="openAp" data-id="${n.id}">Details</button></span></section>`})()}
   ${S.device==='phone'?'':calendar()}`}
@@ -1137,15 +1165,19 @@ const PICON={today:'schedule',people:'appts',practice:'insights'};
 const placeOf=tb=>PLACES.find(p=>p[2].includes(tb))||PLACES[0];
 function placeNav(){const pl=placeOf(S.t.tab);return PLACES.map(([k,l,t])=>`<button data-a="tab" data-v="${t[0]}" ${pl[0]===k?'aria-current="page"':''}>${l}</button>`).join('')}
 function subnav(){const p=placeOf(S.t.tab);if(p[0]==='today')return '';return `<div class="tabs-x"><nav class="tabs sub" aria-label="${p[1]} sections">${p[2].map(k=>`<button data-a="tab" data-v="${k}" ${S.t.tab===k?'aria-current="page"':''}>${SUBL[k]}${PAID_TABS[k]&&!paid()?'<span class="paidtag">Paid</span>':k==='waitlist'&&D().waitlist.length?` · ${D().waitlist.length}`:''}</button>`).join('')}</nav></div>`}
+function todayTimeline(){const list=calEvs(T0);if(!list.length)return '';const now=Date.now();const nx=list.find(a=>a.status==='upcoming'&&a.start+a.dur*6e4>now);
+  return `<section class="panel" aria-label="Today’s sessions"><h2 class="h2" style="margin-bottom:6px">Today’s sessions</h2>${list.map(a=>{const v=a===nx?videoFor(a):null;const over=a!==nx&&(a.status!=='upcoming'||a.start+a.dur*6e4<=now);
+    return `<div class="tl${a===nx?' next':''}${over?' done':''}" style="${tyS(a.type)}"><button class="main" data-a="openAp" data-id="${a.id}"><span class="t">${fT(a.start)}</span><span style="min-width:0"><b>${esc(nm(a.name))}</b><small>${esc(typeOf(a.type).name)} · ${a.dur} min · ${a.mode==='In person'?'In person':'Online'}${a===nx?' · next':''}</small></span></button>${pill(a)}${v?`<a class="mini pri" href="https://${v}" target="_blank" rel="noopener">Join</a>`:''}</div>`}).join('')}</section>`}
 function todoQueue(){const d=D(),items=[],f=S.t.freed;
-  const row=(t,s,acts)=>`<div class="todo"><span><b>${t}</b><small>${s}</small></span><span class="acts">${acts}</span></div>`;
+  const titles=[];const row=(t,s,acts)=>(titles.push(t),`<div class="todo"><span><b>${t}</b><small>${s}</small></span><span class="acts">${acts}</span></div>`);
   if(f&&f.start>Date.now()){const match=paid()?d.waitlist.filter(w=>wlMatches(w,f.start)):[];items.push(row(`${esc(fD(f.start))}, ${fT(f.start)} opened up`,`${esc(nm(f.by))} cancelled${f.late?' late':''}. ${match.length?match.length+' on the waitlist can take it.':(paid()?'Nobody on the waitlist matches this time.':'Waitlist offers are on the paid plan.')}`,`${match.length?`<button class="mini pri" data-a="offer" data-id="${match[0].id}" data-slot="${f.start}">Offer to ${esc(nm(match[0].name))}</button>`:''}<button class="mini w" data-a="dismissFreed">Dismiss</button>`))}
   d.appts.filter(needsLabel).sort((a,b)=>a.start-b.start).forEach(a=>items.push(row(`How did ${esc(nm(a.name))}’s session go?`,`${esc(fD(a.start))}, ${fT(a.start)} · needs a label`,`<button class="mini pri" data-a="quickLabel" data-id="${a.id}" data-v="completed">Completed</button><button class="mini w" data-a="quickLabel" data-id="${a.id}" data-v="noshow">No-show</button><button class="mini w" data-a="openAp" data-id="${a.id}">More</button>`)));
   d.appts.filter(a=>a.status==='upcoming'&&a.label==='noresp'&&a.start>Date.now()&&a.start-Date.now()<3*DAY).sort((a,b)=>a.start-b.start).forEach(a=>items.push(row(`${esc(nm(a.name))} hasn’t confirmed`,`${esc(fD(a.start))}, ${fT(a.start)}`,`<a class="mini pri" href="https://wa.me/?text=${encodeURIComponent(remText(a))}" target="_blank" rel="noopener">Send reminder</a><button class="mini w" data-a="quickLabel" data-id="${a.id}" data-v="confirmed">Mark confirmed</button>`)));
   d.appts.filter(a=>due(a)>0).sort((a,b)=>a.start-b.start).forEach(a=>items.push(row(`${money(due(a))} due from ${esc(nm(a.name))}`,`${esc(fD(a.start))} · ${a.status==='held'?'session held':'late fee'}`,`<button class="mini pri" data-a="apPaid" data-id="${a.id}">Record payment</button><a class="mini w" href="https://wa.me/?text=${encodeURIComponent(payText(a))}" target="_blank" rel="noopener">Send UPI request</a>`)));
   const sup=d.appts.filter(a=>a.sup&&!a.supDone).length;if(sup)items.push(row(`${sup} session${sup===1?'':'s'} tagged for supervision`,'Tick them off when you log supervision.',`<button class="mini w" data-a="tab" data-v="log">Open training log</button>`));
-  const n=items.length,show=S.t.todoAll?items:items.slice(0,4);
-  return `<section class="panel" aria-label="To do"><div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap;padding-bottom:8px"><h2 class="h2">${n?`${n} thing${n===1?'':'s'} to clear`:'All clear'}</h2>${n>4?`<button class="linkbtn" style="padding:0" data-a="set" data-k="t.todoAll" data-v="${S.t.todoAll?'':'1'}">${S.t.todoAll?'Show fewer':'Show all '+n}</button>`:''}</div>${n?show.join(''):'<p class="muted" style="margin:0">Nothing needs you right now. Labels, payments and open slots show up here.</p>'}</section>`}
+  const n=items.length,show=S.t.todoAll?items:items.slice(0,4);const open=S.t.todoOpen==='1'||(S.t.todoOpen!=='0'&&!calEvs(T0).length);
+  if(n&&!open)return `<section class="panel" aria-label="To do" style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;padding-top:14px;padding-bottom:14px"><span style="min-width:0"><b>${n} thing${n===1?'':'s'} to clear</b><small style="display:block;font-size:13px;color:var(--text2);margin-top:2px">First: ${titles[0]}</small></span><button class="mini w" data-a="set" data-k="t.todoOpen" data-v="1">Show</button></section>`;
+  return `<section class="panel" aria-label="To do"><div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap;padding-bottom:8px"><h2 class="h2">${n?`${n} thing${n===1?'':'s'} to clear`:'All clear'}</h2>${n&&calEvs(T0).length?`<button class="linkbtn" style="padding:0" data-a="set" data-k="t.todoOpen" data-v="0">Hide</button>`:''}${n>4?`<button class="linkbtn" style="padding:0" data-a="set" data-k="t.todoAll" data-v="${S.t.todoAll?'':'1'}">${S.t.todoAll?'Show fewer':'Show all '+n}</button>`:''}</div>${n?show.join(''):'<p class="muted" style="margin:0">Nothing needs you right now. Labels, payments and open slots show up here.</p>'}</section>`}
 function peopleRows(q){q=(q||'').trim().toLowerCase();const cl=clientList().filter(k=>!q||k.name.toLowerCase().includes(q));
   return cl.length?cl.map(k=>`<div class="crow"><button class="linkbtn prow" data-a="person" data-v="${esc(k.name)}"><b>${esc(nm(k.name))}</b>${k.ended?' <span class="pill lb-pur"><i></i>Ended</span>':''}<small>${k.held} session${k.held===1?'':'s'} held · ${k.next?'next '+esc(fD(k.next))+', '+fT(k.next):'nothing booked'}${k.due?' · '+money(k.due)+' due':''}</small></button><span class="acts"><button class="mini pri" data-a="newAp" data-from="cal" data-client="${esc(k.name)}">Book</button></span></div>`).join(''):`<p class="muted" style="margin:0">${q?'No client matches that name.':'No clients yet.'}</p>`}
 function tPeople(){const who=S.t.person,k=who&&clientList().find(x=>x.name===who);
@@ -1153,12 +1185,14 @@ function tPeople(){const who=S.t.person,k=who&&clientList().find(x=>x.name===who
     ${phSeg('people')}<input class="in" id="peopleq" data-f="t.pq" value="${esc(S.t.pq||'')}" placeholder="Search by name" aria-label="Search clients" autocomplete="off">
     <section class="panel" id="peoplelist">${peopleRows(S.t.pq)}</section>`;
   const list=D().appts.filter(a=>a.name===k.name).sort((a,b)=>b.start-a.start);const wl=D().waitlist.find(w=>w.name===k.name);const paid=list.filter(a=>a.paid&&a.pay);const first=list.slice().reverse().find(a=>a.intake&&a.intake.length);const owes=list.filter(a=>due(a)>0);const sup=list.filter(a=>a.sup&&!a.supDone).length;
+  const waNum=String(k.wa||'').replace(/\D/g,''),now=Date.now();
+  const items=list.map(a=>({t:a.start,up:a.status==='upcoming'&&a.start>now,h:arow(a)})).concat(paid.map(a=>({t:a.pay.at||a.start,up:false,h:`<div class="payrow"><span>Payment received${a.pay.method?' · '+esc(a.pay.method):''}${a.pay.utr?' · UTR '+esc(a.pay.utr):''}<br><span style="font-size:13px">for the session on ${esc(fD(a.start))}</span></span><b>${money(payAmt(a))}</b></div>`}))).sort((x,y)=>y.t-x.t);
+  let feed='',last='';items.filter(i=>i.up).reverse().concat(items.filter(i=>!i.up)).forEach(i=>{const g=i.up?'Coming up':new Date(i.t).toLocaleDateString('en-IN',{month:'long',year:'numeric'});if(g!==last){feed+=`<h3 class="feedh">${esc(g)}</h3>`;last=g}feed+=i.h});
   return `<button class="linkbtn" style="align-self:flex-start;padding:0" data-a="personBack">← All clients</button>
-  <div class="ttl"><div><h1>${esc(nm(k.name))}</h1><p>${k.held} session${k.held===1?'':'s'} held · ${k.next?'next '+esc(fD(k.next))+', '+fT(k.next):'nothing booked'}${k.ended?' · therapy ended':''}</p></div><span class="acts"><button class="btn" data-a="newAp" data-from="cal" data-client="${esc(k.name)}" style="height:42px;font-size:15px">Book a session</button></span></div>
+  <div class="ttl"><div><h1>${esc(nm(k.name))}</h1><p>${k.held} session${k.held===1?'':'s'} held · ${k.next?'next '+esc(fD(k.next))+', '+fT(k.next):'nothing booked'}${k.ended?' · therapy ended':''}</p></div><span class="acts"><button class="btn" data-a="newAp" data-from="cal" data-client="${esc(k.name)}" style="height:42px;font-size:15px">Book a session</button>${!S.t.hide&&waNum.length>=10?`<a class="btn2" style="height:42px;font-size:15px" href="https://wa.me/${waNum}" target="_blank" rel="noopener">WhatsApp</a>`:''}${!S.t.hide&&k.email?`<a class="btn2" style="height:42px;font-size:15px" href="mailto:${esc(k.email)}">Email</a>`:''}</span></div>
   ${owes.length?`<div class="note warn" style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap"><span><b>${money(k.due)} due</b> across ${owes.length} session${owes.length===1?'':'s'}.</span><span class="acts"><button class="mini pri" data-a="apPaid" data-id="${owes[0].id}">Record payment</button><a class="mini w" href="https://wa.me/?text=${encodeURIComponent(payText(owes[0]))}" target="_blank" rel="noopener">Send UPI request</a></span></div>`:''}
-  <section class="panel"><dl class="kv"><dt>WhatsApp</dt><dd>${esc(S.t.hide?'Hidden':k.wa||'Not saved')}</dd><dt>Email</dt><dd>${esc(S.t.hide?'Hidden':k.email||'Not saved')}</dd><dt>Intake</dt><dd>${first?`<button class="linkbtn" style="padding:0" data-a="openAp" data-id="${first.id}">Answered ${esc(fD(first.bookedAt||first.start))} · open</button>`:'Not filled in'}</dd><dt>Waitlist</dt><dd>${wl?'Waiting for a slot':'Not on the waitlist'}</dd><dt>Supervision</dt><dd>${sup?sup+' session'+(sup===1?'':'s')+' tagged':'Nothing tagged'}</dd></dl></section>
-  <section class="panel"><h2 class="h2" style="margin-bottom:6px">Sessions</h2>${list.length?list.map(arow).join(''):'<p class="muted" style="margin:0">No sessions yet.</p>'}</section>
-  <section class="panel"><h2 class="h2" style="margin-bottom:6px">Payments</h2>${paid.length?paid.map(a=>`<div class="crow"><span>${esc(fD(a.pay.at||a.start))}<span class="muted"> · session ${esc(fD(a.start))}</span></span><span>${money(payAmt(a))} · ${esc(a.pay.method)}${a.pay.utr?' · UTR '+esc(a.pay.utr):''}</span></div>`).join(''):'<p class="muted" style="margin:0">No payments recorded yet.</p>'}</section>`}
+  <section class="panel"><h2 class="h2">History</h2>${feed||'<p class="muted" style="margin:6px 0 0">No sessions yet.</p>'}</section>
+  <section class="panel"><dl class="kv"><dt>WhatsApp</dt><dd>${esc(S.t.hide?'Hidden':k.wa||'Not saved')}</dd><dt>Email</dt><dd>${esc(S.t.hide?'Hidden':k.email||'Not saved')}</dd><dt>Intake</dt><dd>${first?`<button class="linkbtn" style="padding:0" data-a="openAp" data-id="${first.id}">Answered ${esc(fD(first.bookedAt||first.start))} · open</button>`:'Not filled in'}</dd><dt>Waitlist</dt><dd>${wl?'Waiting for a slot':'Not on the waitlist'}</dd><dt>Supervision</dt><dd>${sup?sup+' session'+(sup===1?'':'s')+' tagged':'Nothing tagged'}</dd></dl></section>`}
 function findResults(q){q=(q||'').trim().toLowerCase();const cl=clientList().filter(k=>!q||k.name.toLowerCase().includes(q)).slice(0,q?6:4);
   const acts=[['New session','newAp','cal','Book a client into a time'],['Add a client','newAp','clients','Save their details and send the booking link'],['Block time','tab','hours','Take hours off your booking page'],['Record a payment','tab','payments','Enter a UTR against a session'],['Add to the waitlist','tab','waitlist','Someone waiting for a slot'],['Log supervision','tab','log','Hours and the cases you discussed']].filter(a=>!q||(a[0]+' '+a[3]).toLowerCase().includes(q));
   return (cl.length?`<p class="muted" style="margin:8px 0 0;font-size:13px;font-weight:600">Clients</p>`+cl.map(k=>`<div class="crow"><button class="linkbtn prow" data-a="person" data-v="${esc(k.name)}"><b>${esc(nm(k.name))}</b><small>${k.next?'next '+esc(fD(k.next))+', '+fT(k.next):'nothing booked'}${k.due?' · '+money(k.due)+' due':''}</small></button><span class="acts"><button class="mini pri" data-a="newAp" data-from="cal" data-client="${esc(k.name)}">Book</button></span></div>`).join(''):'')
@@ -1323,7 +1357,7 @@ function act0(a,el){const ds=el.dataset,c=S.c,d=D();if(a!=='calMenu')S.t.calMenu
   case 'reset':if(SB)break;S=Object.assign(fresh(),{view:S.view,device:S.device});save();toast('Demo reset to example data');break;
   case 'set':{let v=ds.v;const cur=getPath(ds.k);if(ds.k==='c.cancelReason'||ds.k==='modal.reason'){if(cur===v)v=''}setPath(ds.k,v==='' && (ds.k==='c.cancelAsk'||ds.k==='modal.cancel'||ds.k==='modal.show')?false:v);if(ds.k.startsWith('c.a.'))delete c.err[ds.k.slice(4)];break}
   case 'go':if(ds.v==='waitlist'){c.wlFrom=c.step;c.wlDone=false}go(ds.v);if(ds.v==='intro'){c.resched=null;c.wlDone=false}break;
-  case 'startBook':if(c.step==='booked'&&c.booked){const b=d.appts.find(x=>x.id===c.booked);if(b&&b.status==='cancelled'){S.c=newClient();}}S.c.type=ds.v||S.c.type||'first';S.c.slot=null;S.c.day=null;go('time');break;
+  case 'startBook':if(c.step==='booked'&&c.booked){const b=d.appts.find(x=>x.id===c.booked);if(b&&b.status==='cancelled'){S.c=newClient();}}S.c.type=ds.v||S.c.type||'first';S.c.slot=null;S.c.day=ds.day?Number(ds.day):null;go('time');break;
   case 'back':{const m={time:'intro',details:'time',about:'details',confirm:needIntake()?'about':'details',waitlist:c.wlFrom==='time'?'time':'intro'};if(c.step==='time'&&c.resched){c.resched=null;go('booked');break}go(m[c.step]||'intro');break}
   case 'pickType':c.type=ds.v;c.slot=null;c.day=null;break;
   case 'pickDay':c.day=Number(ds.v);c.slot=null;break;

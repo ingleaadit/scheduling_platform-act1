@@ -288,6 +288,26 @@ details.faq p{margin:10px 0 0;color:var(--text2);line-height:1.55;max-width:64ch
 .ttl p{margin:6px 0 0;color:var(--text2);font-size:17px}
 .arow{width:100%;text-align:left;border:0;background:none;display:grid;grid-template-columns:118px minmax(0,1fr) auto auto;gap:14px;align-items:center;padding:12px 0;border-bottom:1px solid var(--line)}
 .arow:last-child{border-bottom:0}
+:root{--ty0:#3F8A63;--ty1:#C9812B;--ty2:#4F78C4;--ty3:#9B62B0;--ty4:#C2605A}
+.arow,.ev,.tl{box-shadow:inset 4px 0 0 var(--ty,transparent)}
+.arow{padding-left:12px}
+.tl{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;padding:12px 12px 12px 14px;border-bottom:1px solid var(--line)}
+.tl:last-child{border-bottom:0}
+.tl .main{flex:1 1 230px;min-width:0;border:0;background:none;color:inherit;text-align:left;display:flex;gap:14px;align-items:center;padding:0}
+.tl .t{width:76px;flex:none;font-weight:600;font-variant-numeric:tabular-nums}
+.tl small{display:block;font-size:13px;color:var(--text2);margin-top:2px}
+.tl.next{background:var(--soft);border-radius:12px;border-bottom:0}
+.tl.done{opacity:.62}
+.avg{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px;max-width:420px}
+.avg .avh{font-size:12px;color:var(--text2);text-align:center;padding-bottom:2px}
+.avd{height:44px;border-radius:12px;border:1px solid transparent;background:none;font-size:15px;color:var(--text2);display:flex;align-items:center;justify-content:center}
+button.avd{background:var(--soft);color:var(--text);font-weight:600}
+button.avd:hover{border-color:var(--accent)}
+.avd.off{opacity:.35}
+.avd.now{text-decoration:underline;text-underline-offset:4px}
+.feedh{font-size:12px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.07em;margin:16px 0 2px}
+.payrow{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:11px 0 11px 12px;border-bottom:1px solid var(--line);font-size:14px;color:var(--text2)}
+.payrow b{color:var(--text);font-variant-numeric:tabular-nums}
 .arow small{display:block;font-size:13px;color:var(--text2);margin-top:2px}
 .arow b{font-weight:600}
 .arow .fee{font-size:14px;color:var(--text2);text-align:right;font-variant-numeric:tabular-nums;min-width:84px}
@@ -295,7 +315,7 @@ details.faq p{margin:10px 0 0;color:var(--text2);line-height:1.55;max-width:64ch
 .wday{background:var(--panel);border-radius:14px;padding:12px;display:flex;flex-direction:column;gap:8px;min-width:0;min-height:150px}
 .wday h4{margin:0;font-size:13px;color:var(--text2);font-weight:600}
 .wday.today h4{color:var(--accent)}
-.ev{border:0;text-align:left;background:var(--card);border-radius:12px;padding:8px 10px;font-size:13px;line-height:1.3;width:100%}
+.ev{border:0;text-align:left;background:var(--card);border-radius:12px;padding:8px 10px 8px 13px;font-size:13px;line-height:1.3;width:100%}
 .ev b{display:block;font-size:13px}
 .ev.blk{background:transparent;border:1px dashed var(--line);color:var(--text2)}
 .bar{display:grid;grid-template-columns:130px minmax(0,1fr) 28px;gap:12px;align-items:center;font-size:14px}

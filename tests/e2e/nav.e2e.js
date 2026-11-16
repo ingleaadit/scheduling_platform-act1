@@ -29,6 +29,7 @@ const store=pg=>pg.evaluate(()=>{const k=Object.keys(localStorage).find(k=>/prac
    await pg.click('nav.tabbar [data-v="schedule"]');
   }
   // undo round trip: Mark confirmed on the first unconfirmed session
+  if(await pg.$('[data-k="t.todoOpen"][data-v="1"]')){await pg.click('[data-k="t.todoOpen"][data-v="1"]');await pg.waitForTimeout(150)}
   const btn=await pg.$('[data-a="quickLabel"][data-v="confirmed"]');ok(label+': a Mark confirmed button exists',!!btn);
   if(btn){const id=await btn.getAttribute('data-id');
    const b4=JSON.stringify((await store(pg)).appts.find(a=>a.id===id));await btn.click();await pg.waitForTimeout(250);
