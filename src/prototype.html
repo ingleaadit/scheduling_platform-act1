@@ -307,6 +307,8 @@ details.faq p{margin:10px 0 0;color:var(--text2);line-height:1.55;max-width:64ch
 .avd{height:44px;border-radius:12px;border:1px solid transparent;background:none;font-size:15px;color:var(--text2);display:flex;align-items:center;justify-content:center}
 button.avd{background:var(--soft);color:var(--text);font-weight:600}
 button.avd:hover{border-color:var(--accent)}
+button.avd:disabled{background:none;color:var(--text2);font-weight:400;opacity:.7}
+button.avd.on{background:var(--accent);color:var(--accent-ink)}
 .avd.off{opacity:.35}
 .avd.now{text-decoration:underline;text-underline-offset:4px}
 .feedh{font-size:12px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.07em;margin:16px 0 2px}
@@ -768,7 +770,6 @@ function vIntro(m){const p=P();return `${m?'':''}<div class="${m?'mbody':'cwrap'
     <p class="muted" style="margin:0;font-size:14px">${esc(p.where)}</p>
     ${m?'':`<div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:6px"><button class="btn" data-a="startBook">Book a session</button><button class="btn2" data-a="go" data-v="waitlist">Join the waitlist</button></div>`}
   </div><div class="portrait photo"><img src="portrait.jpg" alt="${esc(p.name)}" width="1170" height="845" decoding="async"></div></section>
-  ${availGrid()}
   <section class="sec"><h2 class="h2">Sessions</h2><div class="types">${D().types.map(t=>`<button class="type" data-a="startBook" data-v="${t.id}"><b>${esc(t.name)}</b><span class="muted" style="font-size:14px;line-height:1.45">${esc(t.desc)}</span><span style="display:flex;justify-content:space-between;align-items:baseline;margin-top:6px"><span class="price">${money(t.fee)}</span><span class="muted" style="font-size:13px">${t.min} min</span></span></button>`).join('')}</div></section>
   <section class="sec" style="gap:0;max-width:760px"><h2 class="h2" style="margin-bottom:6px">Questions people ask</h2>
     ${[['What happens in the first session?','We talk about what brings you here and what you hope will change. You can share as much or as little as you like, and we decide together whether to keep meeting.'],
@@ -780,18 +781,19 @@ function vIntro(m){const p=P();return `${m?'':''}<div class="${m?'mbody':'cwrap'
       .map(([q,a])=>`<details class="faq"><summary>${esc(q)}</summary><p>${esc(a)}</p></details>`).join('')}
   </section>${m?crisis():''}</div>`}
 
-function availGrid(){const ty=D().types[0];if(!ty)return '';const off=(new Date(T0).getDay()+6)%7;let cells='',any=false;
-  for(let i=-off;i<14||(i+off)%7!==0;i++){const d=T0+i*DAY,dn=new Date(d).getDate(),n=i>=0&&i<14?slotsFor(d,ty.min).length:0;
-    if(n){any=true;cells+=`<button class="avd${i===0?' now':''}" data-a="startBook" data-v="${ty.id}" data-day="${d}" aria-label="${esc(fDL(d))}, ${n} time${n===1?'':'s'} open">${dn}</button>`}
-    else cells+=`<span class="avd${i<0||i>=14?' off':''}${i===0?' now':''}"${i>=0&&i<14?` aria-label="${esc(fDL(d))}, full"`:' aria-hidden="true"'}>${dn}</span>`}
-  return `<section class="sec" style="gap:12px"><h2 class="h2">Open days</h2>${any?`<p class="muted" style="margin:0;font-size:14px">Highlighted days have a time free in the next two weeks. Tap one to see the times.</p><div class="avg" role="group" aria-label="Open days">${['M','T','W','T','F','S','S'].map(x=>`<span class="avh" aria-hidden="true">${x}</span>`).join('')}${cells}</div>`:'<p class="muted" style="margin:0">No open times in the next two weeks.</p>'}</section>`}
+function dayGrid(ty,sel){const off=(new Date(T0).getDay()+6)%7;let cells='';
+  for(let i=-off;i<14||(i+off)%7!==0;i++){const d=T0+i*DAY,dn=new Date(d).getDate();
+    if(i<0||i>=14){cells+=`<span class="avd off" aria-hidden="true">${dn}</span>`;continue}
+    const n=slotsFor(d,ty.min).length;
+    cells+=`<button class="avd${d===sel?' on':''}${i===0?' now':''}" ${n?'':'disabled'} aria-pressed="${d===sel}" data-a="pickDay" data-v="${d}" aria-label="${esc(fDL(d))}, ${n?n+' time'+(n===1?'':'s')+' open':'full'}">${dn}</button>`}
+  return `<div class="avg" role="group" aria-label="Day">${['M','T','W','T','F','S','S'].map(x=>`<span class="avh" aria-hidden="true">${x}</span>`).join('')}${cells}</div>`}
 function vTime(){const c=S.c,ty=typeOf(c.type),ds=days();
   if(c.day==null||!slotsFor(c.day,ty.min).length){const f=ds.find(d=>slotsFor(d,ty.min).length);c.day=f==null?ds[0]:f}
   const sl=slotsFor(c.day,ty.min);
   return `<div class="sec"><span class="ql" style="font-size:14px;font-weight:600">Session</span><div class="chips">${D().types.filter(t=>!c.resched||t.id===c.type).map(t=>`<button class="chip${t.id===c.type?' on':''}" aria-pressed="${t.id===c.type}" data-a="pickType" data-v="${t.id}">${esc(t.name)} · ${t.min} min</button>`).join('')}</div></div>
   ${c.resched?'':chips('c.mode',['Online','In person'],'How you’d like to meet')}
   <div class="sec"><span style="font-size:14px;font-weight:600">${new Date(c.day).toLocaleDateString('en-IN',{month:'long',year:'numeric'})}</span>
-  <div class="dates" role="group" aria-label="Day">${ds.map(d=>{const n=slotsFor(d,ty.min).length;const dt=new Date(d);return `<button class="date${d===c.day?' on':''}" ${n?'':'disabled'} aria-pressed="${d===c.day}" data-a="pickDay" data-v="${d}" aria-label="${esc(fDL(d))}, ${n} times"><span>${dt.toLocaleDateString('en-IN',{weekday:'short'})}</span><b>${dt.getDate()}</b><span>${n?n+' free':'Full'}</span></button>`}).join('')}</div></div>
+  <p class="muted" style="margin:0;font-size:14px">Highlighted days have a time free. Tap one to see the times.</p>${dayGrid(ty,c.day)}</div>
   <div class="sec"><span style="font-size:14px;font-weight:600">${esc(fDL(c.day))}</span>${sl.length?`<div class="slots" role="group" aria-label="Times">${sl.map(s=>`<button class="slot${s===c.slot?' on':''}" aria-pressed="${s===c.slot}" data-a="pickSlot" data-v="${s}">${fT(s)}</button>`).join('')}</div>`:'<p class="muted" style="margin:0">No times left on this day.</p>'}
   <p class="muted" style="margin:0;font-size:13px">Times shown in India Standard Time.</p></div>
   ${c.resched||!paid()?'':`<div class="note soft" style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap"><span><b>None of these work?</b><br><span class="muted">Join the waitlist and get a WhatsApp message when a time you want opens up.</span></span><button class="mini w" data-a="go" data-v="waitlist">Join the waitlist</button></div>`}`}
@@ -1357,7 +1359,7 @@ function act0(a,el){const ds=el.dataset,c=S.c,d=D();if(a!=='calMenu')S.t.calMenu
   case 'reset':if(SB)break;S=Object.assign(fresh(),{view:S.view,device:S.device});save();toast('Demo reset to example data');break;
   case 'set':{let v=ds.v;const cur=getPath(ds.k);if(ds.k==='c.cancelReason'||ds.k==='modal.reason'){if(cur===v)v=''}setPath(ds.k,v==='' && (ds.k==='c.cancelAsk'||ds.k==='modal.cancel'||ds.k==='modal.show')?false:v);if(ds.k.startsWith('c.a.'))delete c.err[ds.k.slice(4)];break}
   case 'go':if(ds.v==='waitlist'){c.wlFrom=c.step;c.wlDone=false}go(ds.v);if(ds.v==='intro'){c.resched=null;c.wlDone=false}break;
-  case 'startBook':if(c.step==='booked'&&c.booked){const b=d.appts.find(x=>x.id===c.booked);if(b&&b.status==='cancelled'){S.c=newClient();}}S.c.type=ds.v||S.c.type||'first';S.c.slot=null;S.c.day=ds.day?Number(ds.day):null;go('time');break;
+  case 'startBook':if(c.step==='booked'&&c.booked){const b=d.appts.find(x=>x.id===c.booked);if(b&&b.status==='cancelled'){S.c=newClient();}}S.c.type=ds.v||S.c.type||'first';S.c.slot=null;S.c.day=null;go('time');break;
   case 'back':{const m={time:'intro',details:'time',about:'details',confirm:needIntake()?'about':'details',waitlist:c.wlFrom==='time'?'time':'intro'};if(c.step==='time'&&c.resched){c.resched=null;go('booked');break}go(m[c.step]||'intro');break}
   case 'pickType':c.type=ds.v;c.slot=null;c.day=null;break;
   case 'pickDay':c.day=Number(ds.v);c.slot=null;break;

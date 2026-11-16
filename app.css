@@ -303,6 +303,8 @@ details.faq p{margin:10px 0 0;color:var(--text2);line-height:1.55;max-width:64ch
 .avd{height:44px;border-radius:12px;border:1px solid transparent;background:none;font-size:15px;color:var(--text2);display:flex;align-items:center;justify-content:center}
 button.avd{background:var(--soft);color:var(--text);font-weight:600}
 button.avd:hover{border-color:var(--accent)}
+button.avd:disabled{background:none;color:var(--text2);font-weight:400;opacity:.7}
+button.avd.on{background:var(--accent);color:var(--accent-ink)}
 .avd.off{opacity:.35}
 .avd.now{text-decoration:underline;text-underline-offset:4px}
 .feedh{font-size:12px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.07em;margin:16px 0 2px}
