@@ -1129,10 +1129,10 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape'&&S.modal){S.modal=nu
 const WAS=[
 ['resched','Move or cancel a session','A client changes a session by message. The chat applies Meera’s free-cancellation window and hands anything outside it to her.','The chat never waives a fee. Exceptions go to Meera.'],
 ['backfill','Fill a cancelled slot','A cancellation is offered to the waitlist, one person at a time, each with two hours to answer.','Messages the practice starts need an approved template and the client’s opt-in, taken when they join the waitlist.'],
-['enquiry','New enquiry at night','A stranger writes after hours. Language, fee and a time are sorted before Meera sees it, and she approves each new client.','No health details are collected in chat. The intake form comes by private link.'],
+['enquiry','New enquiry and intake','A stranger writes after hours. The chat sorts language, fee and time, takes the intake answers and consent, and makes the appointment by itself.','Intake answers pass through WhatsApp and Meta. The one clinical question stays on a secure form. Check Meta’s health-data rules and DPDP consent before launch.'],
 ['ther','Meera’s own chat','Meera runs her diary by text or voice note, and the assistant asks before it changes anything.','This demo reads simple keywords. A real version needs a language model, and the confirm step stays.'],
 ['family','Booking for someone else','A parent books for a teenager with guardian consent. An adult is asked before anyone books for them.','Guardian status is claimed in chat, not checked. Meera confirms it at the first session.'],
-['pay','Pay to confirm','A slot is held for 15 minutes while the client pays by UPI.','A UPI link can’t tell us the money arrived. Meera confirms the UTR. A payment gateway would do it automatically, at extra cost.']];
+['pay','Pay to confirm','A slot is held for 15 minutes while the client pays by UPI, from WhatsApp or any UPI app.','Without a payment gateway nothing tells us the money arrived, so Meera confirms the UTR. Paying inside the chat needs a verified WhatsApp business account and a gateway in her name.']];
 const WA_NUM='+91 98765 43210';
 const WA_VOICE='Vikram ka session Thursday shaam ko shift kar do';
 const WA_CRISIS=/suicid|kill myself|end my life|want to die|wanna die|self[- ]?harm|hurt myself|don['’]?t want to (live|be here)|no reason to live|marna chahta|jeena nahi/i;
@@ -1253,13 +1253,23 @@ WAH.backfill={
   if(k==='!exp'){wl.offered=Date.now();save();wSys('Two hours pass with no reply. The offer lapses and the next person is asked.');wbOffer();return}
   unk()}};
 
-/* 3. A new enquiry at night */
+/* 3. A new enquiry at night: intake and consent happen in the chat, then the booking is made without waiting for anyone */
+const waQs=()=>D().intake.filter(q=>!q.private);
+function enqAsk(){const w=waS(),x=w.x,q=waQs()[x.qi];
+  if(!q){if(D().intake.some(r=>r.private))wIn('One more question is private, so it goes on a secure form instead of this chat. I’ll send the link once you’re booked.');enqConsent();return}
+  if(q.type==='choice')wIn(q.label,q.opts.map(o=>[o,'a:'+o]));else wIn(q.label+(q.hint?'\n'+q.hint:''));
+  w.st='intake'}
+function enqConsent(){const w=waS(),x=w.x,s=D().settings,minor=Number(x.ans.age)<18;
+  if(minor&&!x.g){
+    if(!s.minors){wIn('Meera isn’t seeing clients under 18 right now. I haven’t kept your answers. I can pass your number to her so she can suggest someone.');w.st='done';return}
+    wIn('Meera sees clients under 18 with a parent or guardian’s agreement. Please send their name, how they’re related to you and their WhatsApp number. For example “Sunita, mother, 98765 12345”.');w.st='guardian';return}
+  wIn(`Before I book: what you share stays between you and ${firstName(P().name)}, unless someone is at serious risk, the law requires it, or you give permission. You can move or cancel for free up to ${s.cancelWindow} hours before. Later cancellations are charged ${s.latePct}% of the fee, and a missed session in full. This service is not for emergencies: call Tele-MANAS on 14416.${minor?'\n\nYour guardian is also asked to agree before the first session.':''}`,[['I agree and book','agree'],['Read the full policy','policy'],['No thanks','no']]);w.st='consent'}
 WAH.enquiry={
  start(){const w=waS();wOut('Hi, I want to book a session');
-  wIn('Hi, you’ve reached '+ini()+' Practice. I’m an automated assistant for bookings. I can’t give advice, and Meera replies personally to anything else.\n\nPlease don’t share personal or health details in this chat.',[['Book a first session','book'],['Fees and languages','info'],['Talk to Meera','human']]);
+  wIn('Hi, you’ve reached '+ini()+' Practice. I’m an automated assistant for bookings. I can’t give advice, and Meera replies personally to anything else.\n\nI’ll ask a few basic questions before booking. Please don’t write about why you’re looking for help here. That goes on a private form.',[['Book a first session','book'],['Fees and languages','info'],['Talk to Meera','human']]);
   wSys('It is late at night. Meera is offline and the assistant answers.');w.st='home'},
  step(v,text){const w=waS(),x=w.x,d=D(),s=d.settings,langs=P().langs.split(',').map(q=>q.trim()).filter(Boolean);
-  let k=v;if(!k&&w.st!=='name'&&w.st!=='when'){k=/fee|price|cost|language/i.test(text)?'info':/meera|talk|call/i.test(text)?'human':'?'}
+  let k=v;if(!k&&['home','info'].includes(w.st)){k=/fee|price|cost|language/i.test(text)?'info':/meera|talk|call/i.test(text)?'human':'?'}
   if(w.st==='home'||w.st==='info'){
     if(k==='info'){wIn(d.types.map(q=>`${q.name}: ${q.min} min, ${money(q.fee)}`).join('\n')+`\n\nLanguages: ${P().langs}.\n${P().where}.`,[['Book a first session','book'],['Talk to Meera','human']]);w.st='info';return}
     if(k==='human'){wIn('Okay, I’ll pass this to Meera. She usually replies within a few hours.');wSys('Meera sees: “New enquiry from '+WA_NUM+', would like to talk first.” The assistant stops until she replies.');w.st='done';return}
@@ -1276,20 +1286,30 @@ WAH.enquiry={
     if(k==='first'||k==='reduced'){x.type=k;wSlots('Which time suits? Pick one, or tell me, like “weekday evenings”.',k,null);w.st='when';return}
     unk();return}
   if(w.st==='when'){
-    if(k&&k[0]==='s'&&/^s\d+$/.test(k)){x.t=Number(k.slice(1));wIn('What name should I put on the booking? A first name is enough.');w.st='name';return}
+    if(k&&/^s\d+$/.test(k)){x.t=Number(k.slice(1));wIn('What name should I put on the booking? A first name is enough.');w.st='name';return}
     const wh=waWhen(text||'');if(wh.day!=null||wh.part||wh.mins!=null){wSlots('',x.type,wh);return}
     unk();return}
   if(w.st==='name'){
-    x.name=String(text||'').replace(/[^\p{L} .'-]/gu,'').trim().slice(0,40)||'New client';const ty=typeOf(x.type);
-    wIn(`Thanks, ${firstName(x.name)}. Request sent: ${wWhen(x.t)}, ${ty.name.toLowerCase()}, ${x.mode.toLowerCase()}.\nMeera confirms new clients herself, usually within a few hours. I’ll message you here.`,[['Demo: Meera approves','!approve'],['Demo: Meera can’t fit it','!decline']]);
-    wSys(`Meera sees: “New request from ${x.name}: ${wWhen(x.t)}, ${ty.name}, ${x.mode}.” with Approve and Decline. No health details were collected.`);w.st='wait';return}
-  if(w.st==='wait'){
-    if(k==='!approve'){const a=waBook(x);
-      wIn(`Confirmed, ${firstName(x.name)}: ${wWhen(a.start)} with Meera. ${x.mode==='Online'?'The video link comes the evening before.':'It’s in person: '+P().where.replace(/^Online, and in person in /,'')+'.'}\n\nFree to move or cancel up to ${s.cancelWindow} hours before. A private form for consent and a few questions follows by link. Please keep those answers out of this chat.`);
-      wSys('Console: the appointment is added and marked as a new booking.');w.st='done';return}
-    if(k==='!decline'){d.waitlist.push({id:'w'+Date.now(),name:x.name,wa:WA_NUM,days:'Any day',times:'Any time',type:x.type,joined:Date.now(),source:'WhatsApp',offered:null});save();
-      wIn('Meera can’t fit that time right now. I’ve put you on her waitlist, and she or I will message you here when something opens. Reply STOP any time to be removed.');
-      wSys('Console: '+x.name+' is on the waitlist.');w.st='done';return}
+    x.name=String(text||'').replace(/[^\p{L} .'-]/gu,'').trim().slice(0,40)||'New client';x.qi=0;x.ans={};
+    wIn(`Thanks, ${firstName(x.name)}. A few quick questions so Meera can prepare. They’re only for her.`);enqAsk();return}
+  if(w.st==='intake'){const q=waQs()[x.qi];let ans=null;
+    if(q.type==='choice'){ans=k&&k.slice(0,2)==='a:'?k.slice(2):(q.opts.find(o=>o.toLowerCase()===String(text||'').trim().toLowerCase())||null);if(ans==null){unk();return}}
+    else if(q.type==='number'){const n=String(text||'').trim();if(!/^\d{1,3}$/.test(n)||+n<1||+n>120){wIn('Please send just a number, like 27.');return}ans=n}
+    else{ans=String(text||'').trim().slice(0,80);if(!ans){wIn('Please type a short answer.');return}}
+    x.ans[q.id]=ans;x.qi++;enqAsk();return}
+  if(w.st==='guardian'){const p=String(text||'').split(',').map(q=>q.trim()),n=String(text||'').replace(/\D/g,'').slice(-10);
+    if(n.length!==10||!p[0]){wIn('Please send their name, relationship and a 10-digit number, like “Sunita, mother, 98765 12345”.');return}
+    x.g={name:p[0],rel:/\d/.test(p[1]||'')?'Parent or guardian':(p[1]||'Parent or guardian'),wa:'+91 '+n.slice(0,5)+' '+n.slice(5)};
+    wSys(`Sent to ${x.g.wa}: “Hi, this is ${ini()} Practice. Someone has asked to book a session with Meera for a young person in your care. Reply YES to agree, or ignore this.”`);enqConsent();return}
+  if(w.st==='consent'){
+    if(!k)k=waYes(text)?'agree':waNo(text)?'no':'?';
+    if(k==='policy'){wIn(pol(d.consent).replace(/^## /gm,''),[['I agree and book','agree'],['No thanks','no']]);return}
+    if(k==='no'){wIn('No problem. Nothing has been booked, and I haven’t kept your answers.');w.st='done';return}
+    if(k==='agree'){
+      const intake=d.intake.map(q=>({label:q.label,answer:String(x.ans[q.id]==null?'':x.ans[q.id]),private:!!q.private})).filter(q=>q.answer);
+      const a=waBook(x,{intake,consentAt:Date.now(),guardian:x.g||null});
+      wIn(`Booked, ${firstName(x.name)}: ${wWhen(a.start)} with Meera. ${x.mode==='Online'?'The video link comes the evening before.':'It’s in person: '+P().where.replace(/^Online, and in person in /,'')+'.'}\n\nYou can move or cancel for free up to ${s.cancelWindow} hours before. Just write here.${d.intake.some(q=>q.private)?' The secure form for the last question follows by link.':''}${x.g?`\n\n${x.g.name} has been asked to agree. The session is held until they do.`:''}`);
+      wSys(`Console: the appointment is added automatically as a new booking, with ${intake.length} intake answers and the time consent was given.${x.g?' Under 18: guardian consent needed.':''} Meera can still move or cancel it from there.`);w.st='done';return}
     unk();return}
   wIn('Noted. Meera replies personally to anything else.')}};
 
@@ -1388,13 +1408,22 @@ WAH.pay={
   if(!k&&w.st==='when'){const wh=waWhen(text||'');if(wh.day!=null||wh.part||wh.mins!=null){wSlots('',x.type,wh);return}}
   if(w.st==='when'||w.st==='again'){
     if(k&&/^s\d+$/.test(k)){x.t=Number(k.slice(1));
-      wIn(`I’ve held ${wWhen(x.t)} for you for 15 minutes. To confirm it, pay ${money(ty.fee)} by UPI to ${s.upi}.`,[[`Pay ${money(ty.fee)} by UPI`,'pay'],['Demo: 15 minutes pass','!exp']]);w.st='hold';return}
+      wIn(`I’ve held ${wWhen(x.t)} for you for 15 minutes. To confirm it, pay ${money(ty.fee)} by UPI to ${s.upi}. You can pay from WhatsApp or any UPI app.`,[[`Pay ${money(ty.fee)} by UPI`,'pay'],['Demo: 15 minutes pass','!exp'],['Demo: Meera has a payment gateway','!gw']]);w.st='hold';return}
     if(k==='again'){wSlots('Which time suits?',x.type,null);w.st='when';return}
     unk();return}
   if(w.st==='hold'){
     if(k==='pay'||(!k&&/pay|upi|done|paid/i.test(text))){wSys('Your UPI app opens with the amount and Meera’s UPI ID filled in. In this demo, imagine paying.');
       wIn('Once it’s paid, send me the 12-digit transaction ID (UTR) from your UPI app.',[['Demo: 15 minutes pass','!exp']]);w.st='utr';return}
     if(k==='!exp'){this.expire();return}
+    if(k==='!gw'){wSys('Demo: Meera has connected a payment gateway and a verified WhatsApp business account. Now the payment request is an order inside the chat.');
+      wIn(`Session with Meera, ${wWhen(x.t)}\nTotal ${money(ty.fee)}`,[['Pay now','gpay'],['Demo: 15 minutes pass','!exp']]);w.st='ghold';return}
+    unk();return}
+  if(w.st==='ghold'){
+    if(k==='!exp'){this.expire();return}
+    if(k==='gpay'||(!k&&/pay|upi|done|paid/i.test(text))){wSys('Pay now opens the UPI app picker. The client pays in WhatsApp or any UPI app, and the gateway tells us the moment it lands.');
+      const a=waBook(x,{paid:true,pay:{amount:ty.fee,method:'UPI',utr:fakeUtr(Date.now()%1e6),from:'',at:Date.now()}});
+      wIn(`Payment received. ${wWhen(a.start)} is booked. A receipt is on its way.`);
+      wSys('Console: booked and marked paid, with the UTR from the gateway. Meera checks nothing.');w.st='done';return}
     unk();return}
   if(w.st==='utr'){
     if(k==='!exp'){this.expire();return}

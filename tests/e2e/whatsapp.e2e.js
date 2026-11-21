@@ -45,17 +45,27 @@ const KEY = 'practice-proto-v1';
   const ai = d.appts.find((a) => a.name === 'Aisha Khan' && a.status === 'upcoming');
   ok('2: accepting books them and takes them off the waitlist', !!ai && ai.source === 'From waitlist' && !d.waitlist.some((w) => w.name === 'Aisha Khan'));
 
-  // 3. new enquiry
+  // 3. new enquiry: intake and consent in the chat, appointment made automatically
   await fresh(); await scen('enquiry'); await tap('Fees and languages'); ok('3: fees and languages are answered', /Languages: English, Hindi, Malayalam/.test(await txt()));
   await tap('Book a first session'); await tap('Hindi'); await tap('Online'); await tap('Reduced fee'); await tapN(0); await say('Rhea Kapoor');
+  ok('3: it asks the intake questions one by one', /How old are you\?/.test(await txt()));
+  await say('abc'); ok('3: a non-number age is refused', /just a number/.test(await txt()));
+  await say('27'); await say('she/her'); await say('Pune'); await tap('No'); await tap('Instagram');
   t = await txt(); d = await data();
-  ok('3: a request waits for Meera and nothing is booked yet', /Meera confirms new clients herself/.test(t) && !d.appts.some((a) => a.name === 'Rhea Kapoor'));
-  ok('3: the chat never asks for health details', !/(why|reason|symptom|feeling|diagnos)/i.test(t.replace(/Please don’t share personal or health details in this chat\./, '')));
-  await tap('Demo: Meera approves'); d = await data(); const rh = d.appts.find((a) => a.name === 'Rhea Kapoor');
-  ok('3: approval adds the booking as a new WhatsApp booking, at the reduced fee', !!rh && rh.source === 'WhatsApp' && rh.type === 'reduced' && rh.fee === 700 && rh.isNew);
+  ok('3: the clinical question is kept off the chat and goes to a secure form', /secure form instead of this chat/.test(t) && !/Describe your issue/.test(t));
+  ok('3: nothing is booked until the client agrees', !d.appts.some((a) => a.name === 'Rhea Kapoor') && /I agree and book/.test(t));
+  await tap('Read the full policy'); ok('3: the full policy is one tap away', /14416/.test(await txt()) && /Cancellation policy/.test(await txt()));
+  await tap('I agree and book'); d = await data(); const rh = d.appts.find((a) => a.name === 'Rhea Kapoor');
+  ok('3: agreeing makes the appointment by itself, with intake answers and consent time', !!rh && rh.source === 'WhatsApp' && rh.type === 'reduced' && rh.fee === 700 && rh.isNew && !!rh.consentAt && rh.intake.length === 5 && rh.intake.some((q) => q.label === 'Where are you from?' && q.answer === 'Pune') && !rh.intake.some((q) => q.private), JSON.stringify(rh && rh.intake));
   await scen('enquiry'); await tap('Book a first session'); await tap('Another language'); ok('3: a language Meera does not offer goes to her', /suggest someone/.test(await txt()));
-  await scen('enquiry'); await tap('Book a first session'); await tap('English'); await tap('In person'); await tap('First session'); await tapN(0); await say('Zed'); await tap('Meera can’t fit');
-  d = await data(); ok('3: declining puts them on the waitlist', d.waitlist.some((w) => w.name === 'Zed' && w.source === 'WhatsApp'));
+  await scen('enquiry'); await tap('Book a first session'); await tap('English'); await tap('In person'); await tap('First session'); await tapN(0); await say('Zed'); await say('27'); await say('he/him'); await say('Goa'); await tap('Not sure'); await tap('Google'); await tap('No thanks');
+  d = await data(); ok('3: declining consent books nothing and keeps nothing', !d.appts.some((a) => a.name === 'Zed') && /haven’t kept your answers/.test(await txt()));
+  await scen('enquiry'); await tap('Book a first session'); await tap('English'); await tap('Online'); await tap('First session'); await tapN(0); await say('Teen Test'); await say('16'); await say('they/them'); await say('Pune'); await tap('Yes'); await tap('Friend');
+  ok('3: under 18 asks for a guardian', /parent or guardian’s agreement/.test(await txt()));
+  await say('Sunita, mother'); ok('3: a guardian number is required', /10-digit number/.test(await txt()));
+  await say('Sunita, mother, 98765 12345'); ok('3: the guardian is messaged', /Sent to \+91 98765 12345/.test(await txt()));
+  await tap('I agree and book'); d = await data(); const tt = d.appts.find((a) => a.name === 'Teen Test');
+  ok('3: the minor is booked with the guardian recorded', !!tt && tt.guardian && tt.guardian.name === 'Sunita' && tt.guardian.rel === 'mother' && /held until they do/.test(await txt()));
 
   // 4. therapist's own chat
   await fresh(); await scen('ther'); await tap('Who’s tomorrow'); ok('4: "who is tomorrow" lists the day', /(sessions?\.|nothing booked)/.test(await txt()));
@@ -84,6 +94,11 @@ const KEY = 'practice-proto-v1';
   await say('612345678901'); d = await data(); const rm = d.appts.find((a) => a.name === 'Riya Menon' && a.claimed);
   ok('6: a 12-digit UTR books it as claimed, not as paid', !!rm && rm.claimUtr === '612345678901' && rm.paid === false);
   await scen('pay'); await tapN(1); await tap('Demo: 15 minutes pass'); d = await data(); ok('6: an unpaid hold is released and nothing is booked', /hold on .* has ended/.test(await txt()) && !d.appts.some((a) => a.name === 'Riya Menon' && a.claimed && a.id !== rm.id));
+
+  await scen('pay'); await tapN(0); ok('6: the UPI step says WhatsApp or any UPI app works', /WhatsApp or any UPI app/.test(await txt())); await tap('Demo: Meera has a payment gateway');
+  ok('6: with a gateway the request is an order with a Pay now button', /Total ₹1,500/.test(await txt()) && !!(await pg.$('.waq button:has-text("Pay now")')));
+  await tap('Pay now'); d = await data(); const gw = d.appts.filter((a) => a.name === 'Riya Menon' && a.paid && a.status === 'upcoming' && a.pay && a.pay.utr);
+  ok('6: with a gateway it is booked and marked paid with a UTR, no manual check', gw.length === 1 && gw[0].pay.amount === 1500 && !gw[0].claimed);
 
   // safety: self-harm words stop the flow in every client chat
   for (const sc of ['resched', 'enquiry', 'family', 'pay']) {
