@@ -411,6 +411,48 @@ table.t tr:last-child td{border-bottom:0}
   .auth-brand{padding:28px 24px}
   .auth-brand ul{display:none}
 }
+/* WhatsApp booking demo */
+.wastage{display:flex;gap:28px;align-items:flex-start;justify-content:center;width:100%;max-width:960px}
+.wanav{flex:1 1 300px;max-width:400px;display:flex;flex-direction:column;gap:14px;position:sticky;top:96px}
+.wanav h2{font-size:28px}
+.wanav>p{margin:0;font-size:14px;line-height:1.5}
+.wasc{display:flex;flex-direction:column;gap:8px}
+.wasb{text-align:left;border:1px solid var(--line);background:var(--panel);border-radius:14px;padding:11px 14px;display:flex;flex-direction:column;gap:2px;color:var(--text)}
+.wasb b{font-size:15px}
+.wasb span{font-size:13px;line-height:1.4;color:var(--text2)}
+.wasb[aria-pressed="true"]{border-color:var(--accent);background:var(--soft)}
+.wawhy{font-size:14px;line-height:1.5;display:flex;flex-direction:column;gap:4px;padding:14px 16px;border-radius:14px;background:var(--panel)}
+.wawhy b{font-size:13px;color:var(--text2);font-weight:600;margin-top:6px}
+.wawhy b:first-child{margin-top:0}
+.wastage .phone{flex:none}
+.win.wa{--wbg:#EFEAE2;--wbub:#FFFFFF;--wout:#D9FDD3;--wink:#111B21;--wsub:#4F5F68;--wacc:#0A6B5F;--wh:#007560;--wsys:#FFF2C2;--wsysink:#4A3B00;background:var(--wbg);color:var(--wink)}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .win.wa{--wbg:#0B141A;--wbub:#202C33;--wout:#005C4B;--wink:#E9EDEF;--wsub:#C5D1D7;--wacc:#6CD0BE;--wh:#202C33;--wsys:#3A3015;--wsysink:#F2D27A}}
+:root[data-theme="dark"] .win.wa{--wbg:#0B141A;--wbub:#202C33;--wout:#005C4B;--wink:#E9EDEF;--wsub:#C5D1D7;--wacc:#6CD0BE;--wh:#202C33;--wsys:#3A3015;--wsysink:#F2D27A}
+.win.wa .sbar{background:var(--wh);color:#fff}
+.wah{flex:none;display:flex;align-items:center;gap:10px;padding:6px 12px 8px;background:var(--wh);color:#fff}
+.wah>span:nth-child(2){flex:1;display:flex;flex-direction:column;line-height:1.2;min-width:0}
+.wah b{font-size:16px}
+.wah small{font-size:12px}
+.waav{width:38px;height:38px;border-radius:50%;background:#fff;color:#008069;display:grid;place-items:center;font-weight:700;font-size:14px;flex:none}
+.wahb{border:1px solid rgba(255,255,255,.6);background:none;color:#fff;border-radius:16px;padding:5px 12px;font-size:13px}
+.wamsgs{flex:1;overflow:auto;overscroll-behavior:contain;padding:12px 10px;display:flex;flex-direction:column;gap:6px;background:var(--wbg)}
+.wamsgs>*{flex:none}
+.wab{max-width:84%;padding:7px 10px 5px;border-radius:10px;font-size:14.5px;line-height:1.4;white-space:pre-wrap;overflow-wrap:anywhere;color:var(--wink);box-shadow:0 1px 1px rgba(0,0,0,.14)}
+.wab.bot{align-self:flex-start;background:var(--wbub);border-top-left-radius:2px}
+.wab.me{align-self:flex-end;background:var(--wout);border-top-right-radius:2px}
+.wat{display:block;text-align:right;font-size:11px;color:var(--wsub);margin-top:2px}
+.was{align-self:center;max-width:92%;text-align:center;font-size:12.5px;line-height:1.4;background:var(--wsys);color:var(--wsysink);padding:6px 10px;border-radius:8px}
+.waq{align-self:flex-start;display:flex;flex-direction:column;gap:5px;width:84%}
+.waq button{background:var(--wbub);color:var(--wacc);border:0;border-radius:10px;padding:10px 12px;font-weight:600;font-size:14px;box-shadow:0 1px 1px rgba(0,0,0,.14)}
+.waq button.demo{background:transparent;border:1px dashed var(--wsub);color:var(--wsub);font-weight:500;box-shadow:none}
+.wvo{display:flex;align-items:center;gap:8px;min-width:150px}
+.wvo i{font-style:normal;color:var(--wacc)}
+.wbars{flex:1;height:18px;background:repeating-linear-gradient(90deg,var(--wsub) 0 2px,transparent 2px 5px);opacity:.7;mask:linear-gradient(0deg,#000,#000);-webkit-mask:linear-gradient(0deg,#000,#000)}
+.wvo small{font-size:12px;color:var(--wsub)}
+.waf{flex:none;display:flex;gap:8px;padding:8px 10px calc(10px + env(safe-area-inset-bottom,0px));background:var(--wbg)}
+.wain{flex:1;min-width:0;height:44px;border-radius:22px;border:0;padding:0 16px;background:var(--wbub);color:var(--wink);font-size:16px}
+.wasend{width:44px;height:44px;border-radius:50%;border:0;background:var(--wh);color:#fff;font-size:16px;flex:none}
+@media (max-width:860px){.wastage{flex-direction:column;align-items:center}.wanav{max-width:none;width:100%;position:static}.wasc{flex-direction:row;overflow-x:auto;padding-bottom:4px}.wasb{flex:none;width:210px}}
 @media (prefers-reduced-motion:no-preference){.btn,.chip,.slot,.date,.mini,.seg button{transition:background-color .15s,color .15s}}
 </style>
 <style id="pal"></style>
@@ -419,7 +461,7 @@ table.t tr:last-child td{border-bottom:0}
   <div class="sw-in">
     <div class="sw-t"><b>Practice prototype</b><small>Example data. Nothing is sent or shared.</small></div>
     <div class="sw-c">
-      <div class="seg" role="group" aria-label="Window"><button type="button" data-a="view" data-v="client">Client</button><button type="button" data-a="view" data-v="therapist">Therapist</button></div>
+      <div class="seg" role="group" aria-label="Window"><button type="button" data-a="view" data-v="client">Client</button><button type="button" data-a="view" data-v="therapist">Therapist</button><button type="button" data-a="view" data-v="whatsapp" id="wabtn">WhatsApp</button></div>
       <div class="seg" role="group" aria-label="Device"><button type="button" data-a="device" data-v="desktop">Desktop</button><button type="button" data-a="device" data-v="phone">Phone</button></div>
       <button type="button" class="linkbtn" data-a="reset">Reset demo</button>
     </div>
@@ -734,14 +776,17 @@ function render(){
   const key=S.view+S.device+(S.view==='client'?S.c.step:(S.auth?S.t.tab+(S.t.person||''):'login'));
   const sc=document.querySelector('#stage .scr');const keep=key===lastKey?(sc?sc.scrollTop:window.scrollY):null;
   const isM=S.device==='phone';
-  const inner=S.view==='client'?(SLUG&&!S.pubReady?pubLoadingView():isM?clientPhone():clientDesk()):(SB&&!S.sbReady)?'<div class="scr"><p class="muted" style="padding:40px">Loading…</p></div>':!S.auth?signIn(isM):(SB&&!S.dbReady)?sbLoadingView():(isM?therPhone():therDesk());
-  const modal=S.modal?renderModal():'';
+  const wav=S.view==='whatsapp';
+  const inner=wav?'':S.view==='client'?(SLUG&&!S.pubReady?pubLoadingView():isM?clientPhone():clientDesk()):(SB&&!S.sbReady)?'<div class="scr"><p class="muted" style="padding:40px">Loading…</p></div>':!S.auth?signIn(isM):(SB&&!S.dbReady)?sbLoadingView():(isM?therPhone():therDesk());
+  const modal=S.modal&&!wav?renderModal():'';
   const stage=document.getElementById('stage');
   rendering=true;try{const fe=document.activeElement;if(fe&&stage.contains(fe)&&fe.blur)fe.blur()}finally{rendering=false}
-  if(isM){stage.innerHTML=`<div class="phone"><div class="win m">${LIVE?'':'<div class="sbar" aria-hidden="true"><span>9:41</span><span class="isl"></span><span>100%</span></div>'}${inner}${modal}</div></div>`}
+  if(wav){stage.innerHTML=waStage()}
+  else if(isM){stage.innerHTML=`<div class="phone"><div class="win m">${LIVE?'':'<div class="sbar" aria-hidden="true"><span>9:41</span><span class="isl"></span><span>100%</span></div>'}${inner}${modal}</div></div>`}
   else{const url=S.view==='client'?'practice.example/meera-nair':'practice.example/console';stage.innerHTML=`<div class="win d">${LIVE?'':`<div class="chrome" aria-hidden="true"><i></i><i></i><i></i><span class="url">🔒 ${url}</span><span style="width:52px"></span></div>`}${inner}${modal}</div>`}
   if(keep!=null){const s2=document.querySelector('#stage .scr');if(s2)s2.scrollTop=keep;else window.scrollTo(0,keep)}
   else{const s2=document.querySelector('#stage .scr');if(s2)s2.scrollTop=0}
+  if(wav){const m=document.querySelector('.wamsgs');if(m)m.scrollTop=m.scrollHeight;if(S.wa&&S.wa.focus){S.wa.focus=0;const i=document.getElementById('wain');if(i)i.focus()}}
   lastKey=key;
 }
 
@@ -1339,13 +1384,17 @@ function renderModal(){const m=S.modal,s=D().settings;
 
 /* ------------- actions ------------- */
 const go=st=>{S.c.step=st;S.c.err={}};
-const NOUNDO=new Set(['tab','find','close','calNav','calView','calDay','calMenu','hide','undo','logout','view','device','reset','fillDemo','tourReplay','tourNext','tourBack','tourSkip','tourSkipPw','tourHours','openAp','person','personBack','sbretry']);
+const NOUNDO=new Set(['tab','find','close','calNav','calView','calDay','calMenu','hide','undo','logout','view','device','reset','fillDemo','tourReplay','tourNext','tourBack','tourSkip','tourSkipPw','tourHours','openAp','person','personBack','sbretry','waSc','waRestart','waPick','waSend']);
 /* Every change a therapist makes by tapping can be undone: the data before the tap is kept (the last 30). Typing in a field is not recorded here. */
 function act(a,el){const track=!NOUNDO.has(a)&&S.dbReady!==false;const before=track?JSON.stringify(S.data):null;const r=act0(a,el);
   if(track){try{const now=JSON.stringify(S.data);if(now!==before){S.hist=S.hist||[];S.hist.push(before);if(S.hist.length>30)S.hist.shift();S.undoPulse=Date.now();render()}}catch(e){}}return r}
 function act0(a,el){const ds=el.dataset,c=S.c,d=D();if(a!=='calMenu')S.t.calMenu=false;
   switch(a){
-  case 'view':S.view=ds.v;S.modal=null;setHash();break;
+  case 'view':if(ds.v==='whatsapp'&&S.view!=='whatsapp')waEnter();S.view=ds.v;S.modal=null;setHash();break;
+  case 'waSc':waStart(ds.v);break;
+  case 'waRestart':waStart(waS().sc||'resched');break;
+  case 'waPick':waPick(ds.v,ds.l);break;
+  case 'waSend':{const inp=document.getElementById('wain'),v=inp?inp.value:'';if(inp)inp.value='';waSend(v);waS().focus=1;break}
   case 'device':S.device=ds.v;S.modal=null;if(ds.v==='desktop'&&S.t.tab==='more')S.t.tab='schedule';setHash();break;
   case 'sbretry':if(SB)sbLoad();break;
   case 'attend':{const b=d.appts.find(x=>x.id===c.booked);if(!b||c.sending)return;c.sending=true;
@@ -1547,12 +1596,313 @@ function onField(e,commit){const el=e.target;const p=el.dataset&&el.dataset.f;if
   if(commit&&!rendering&&(el.dataset.live||el.type==='checkbox'||el.tagName==='SELECT')&&!(el.type==='checkbox'&&p==='c.agree'))render()}
 document.addEventListener('input',e=>{onField(e,false);const t=e.target;if(t.id==='findq'){const r=document.getElementById('findres');if(r)r.innerHTML=findResults(t.value)}if(t.id==='peopleq'){const r=document.getElementById('peoplelist');if(r)r.innerHTML=peopleRows(t.value)}});
 document.addEventListener('change',e=>{const t=e.target;if(t.id==='impfile'&&t.files&&t.files[0]&&S.modal){const r=new FileReader();r.onload=()=>{S.modal.text=String(r.result||'');render()};r.readAsText(t.files[0]);return}onField(e,true)});
-document.addEventListener('submit',e=>{e.preventDefault();if(e.target.dataset&&e.target.dataset.form==='login')act('login',e.target)});
+document.addEventListener('submit',e=>{e.preventDefault();if(e.target.dataset&&e.target.dataset.form==='login')act('login',e.target);if(e.target.dataset&&e.target.dataset.form==='wa')act('waSend',e.target)});
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&S.modal){S.modal=null;render()}});
+
+/* ------------- WhatsApp booking demo (demo page only). Scripted chats on the same data as the console. Nothing is sent. ------------- */
+const WAS=[
+['resched','Move or cancel a session','A client changes a session by message. The chat applies Meera’s free-cancellation window and hands anything outside it to her.','The chat never waives a fee. Exceptions go to Meera.'],
+['backfill','Fill a cancelled slot','A cancellation is offered to the waitlist, one person at a time, each with two hours to answer.','Messages the practice starts need an approved template and the client’s opt-in, taken when they join the waitlist.'],
+['enquiry','New enquiry at night','A stranger writes after hours. Language, fee and a time are sorted before Meera sees it, and she approves each new client.','No health details are collected in chat. The intake form comes by private link.'],
+['ther','Meera’s own chat','Meera runs her diary by text or voice note, and the assistant asks before it changes anything.','This demo reads simple keywords. A real version needs a language model, and the confirm step stays.'],
+['family','Booking for someone else','A parent books for a teenager with guardian consent. An adult is asked before anyone books for them.','Guardian status is claimed in chat, not checked. Meera confirms it at the first session.'],
+['pay','Pay to confirm','A slot is held for 15 minutes while the client pays by UPI.','A UPI link can’t tell us the money arrived. Meera confirms the UTR. A payment gateway would do it automatically, at extra cost.']];
+const WA_NUM='+91 98765 43210';
+const WA_VOICE='Vikram ka session Thursday shaam ko shift kar do';
+const WA_CRISIS=/suicid|kill myself|end my life|want to die|wanna die|self[- ]?harm|hurt myself|don['’]?t want to (live|be here)|no reason to live|marna chahta|jeena nahi/i;
+const waS=()=>S.wa||(S.wa={sc:'',msgs:[],st:'',x:{},snap:null,snapFreed:null,halt:false,focus:0});
+const wIn=(t,o)=>waS().msgs.push({w:'in',t,o:o||null,at:fT(Date.now())});
+const wOut=(t,v)=>waS().msgs.push({w:'out',t,v:v||'',at:fT(Date.now())});
+const wSys=t=>waS().msgs.push({w:'sys',t});
+const wSlotOpts=a=>a.map(t=>[fD(t)+', '+fT(t),'s'+t]);
+const wWhen=t=>fDL(t)+', '+fT(t);
+function waHour(h,ap){h=+h;if(ap==='pm'&&h<12)h+=12;else if(ap==='am'&&h===12)h=0;else if(!ap&&h>=1&&h<=8)h+=12;return h}
+const waHM=(h,m)=>String(h).padStart(2,'0')+':'+String(m||0).padStart(2,'0');
+/* Reads a loose request such as "Thursday evening", "kal subah" or "friday 5pm". A stand-in for the language model a real version would use. */
+function waWhen(text){const s=String(text).toLowerCase(),r={day:null,part:null,mins:null};
+  if(/\btoday\b|\baaj\b/.test(s))r.day=T0;else if(/\btomorrow\b|\bkal\b/.test(s))r.day=T0+DAY;else if(/\bparso\b|day after/.test(s))r.day=T0+2*DAY;
+  const m=s.match(/\b(sun|mon|tue|wed|thu|fri|sat)(day|sday|nesday|rsday|urday)?\b/);
+  if(r.day==null&&m){const wd=['sun','mon','tue','wed','thu','fri','sat'].indexOf(m[1]);let t=T0+DAY;while(new Date(t).getDay()!==wd)t+=DAY;r.day=t}
+  if(/morning|subah|savere/.test(s))r.part='am';else if(/afternoon|dopahar/.test(s))r.part='noon';else if(/evening|shaam|night|raat|after work/.test(s))r.part='eve';
+  const tm=s.replace(m?m[0]:'','').match(/\b(\d{1,2})(?::(\d{2}))?\s*(am|pm)?\b/);
+  if(tm&&!/\d\s*(am|pm)?\s*(to|till|until|-)\s*\d/.test(s))r.mins=waHour(tm[1],tm[3])*60+(+tm[2]||0);
+  return r}
+function waLabel(h){const p=[];if(h.day!=null)p.push(fD(h.day));if(h.part)p.push({am:'mornings',noon:'afternoons',eve:'evenings'}[h.part]);if(h.mins!=null)p.push('around '+fT(at(T0,'00:00')+h.mins*6e4));return p.join(', ')}
+function waFind(typeId,when,n){const dur=typeOf(typeId).min,out=[];
+  for(let i=0;i<28&&out.length<n;i++){const d=T0+i*DAY;if(when.day!=null&&d!==when.day)continue;
+    for(const s of slotsFor(d,dur)){const dt=new Date(s),h=dt.getHours();
+      if(when.part==='am'&&h>=12)continue;if(when.part==='noon'&&(h<12||h>=17))continue;if(when.part==='eve'&&h<17)continue;
+      if(when.mins!=null&&h*60+dt.getMinutes()!==when.mins)continue;
+      out.push(s);if(out.length>=n)break}}
+  return out}
+function wSlots(msg,typeId,when,more){const has=when&&(when.day!=null||when.part||when.mins!=null);const f=has?waFind(typeId,when,5):[];
+  const list=f.length?f:nextFree(typeId,5);
+  wIn(has?(f.length?'Open '+waLabel(when)+':':'Nothing is open then. The nearest times are:'):msg,wSlotOpts(list).concat(more||[]))}
+function waLastOpts(){const m=waS().msgs;for(let i=m.length-1;i>=0;i--){if(m[i].w==='out')return null;if(m[i].o)return m[i].o}return null}
+function unk(){wIn('Sorry, I didn’t catch that. Please tap one of these, or write it another way.',waLastOpts())}
+function waCrisis(){waS().halt=true;
+  wIn('I’m sorry things feel this heavy. I’m an automated assistant and I can’t help with this, but please talk to someone now.\n\nTele-MANAS: call 14416, free, open 24 hours.\nIf you are in danger right now, call 112 or go to the nearest hospital.');
+  wIn('I’ve also told Meera you wrote to us. She will reply herself.');
+  wSys('Safety rule in every chat: words like these stop the booking flow, show Tele-MANAS and alert Meera. The assistant never carries on this conversation.')}
+function waEnter(){const w=waS();w.snap=JSON.stringify(S.data);w.snapFreed=S.t.freed}
+function waStart(sc){const w=waS();if(w.snap){S.data=ensure(JSON.parse(w.snap));S.t.freed=w.snapFreed||null}
+  w.sc=sc;w.msgs=[];w.st='';w.x={};w.halt=false;WAH[sc].start();save()}
+function waPick(v,label){const w=waS();if(w.halt)return;if(v&&v[0]==='!')wSys(label);else wOut(label,v);WAH[w.sc].step(v,label)}
+function waSend(text){const w=waS();text=String(text||'').trim();if(!text)return;wOut(text);
+  if(w.sc!=='ther'&&WA_CRISIS.test(text)){waCrisis();return}
+  if(w.halt){wIn('I’ve passed your message to Meera. If you need someone right now, please call Tele-MANAS on 14416.');return}
+  WAH[w.sc].step(null,text)}
+const waYes=t=>/^\s*(y|yes|haan|ha|ok|okay|sure|book)/i.test(t);
+const waNo=t=>/^\s*(n|no|nahi|nope|not)/i.test(t);
+const firstUp=(d,name)=>d.appts.filter(a=>a.name===name&&a.status==='upcoming'&&a.start>Date.now()).sort((p,q)=>p.start-q.start)[0];
+function waBook(x,extra){const d=D(),ty=typeOf(x.type),a=Object.assign({id:'a'+Date.now(),name:x.name,wa:x.wa||WA_NUM,email:'',type:ty.id,start:x.t,dur:ty.min,fee:ty.fee,status:'upcoming',paid:false,lateFee:0,late:false,reason:'',waived:false,intake:null,guardian:null,source:'WhatsApp',reminded:false,isNew:true,bookedAt:Date.now(),mode:x.mode||'Online'},extra||{});d.appts.push(a);save();return a}
+const WAH={};
+
+/* 1. A client moves or cancels a session */
+WAH.resched={
+ start(){const w=waS(),x=w.x,a=firstUp(D(),'Vikram Joshi');
+  if(!a){wSys('The demo data has no upcoming session for Vikram. Press Reset demo, then try again.');return}
+  x.id=a.id;
+  /* The demo's session can fall inside the 24-hour window whenever it is opened. Start from a clock that is outside it, so the free path always shows. */
+  if(a.start-Date.now()<D().settings.cancelWindow*36e5){x.now=a.start-30*36e5;wSys(`Demo: pretending it is ${fD(x.now)}, ${fT(x.now)}, 30 hours before the session.`)}
+  wOut('Hi, I can’t make my session. Can we move it?');this.ask(a);w.st='ask'},
+ ask(a){wIn(`Hi ${firstName(a.name)}. Your next session is ${wWhen(a.start)}. What would you like to do?`,[['Move it','mv'],['Cancel it','cn'],['Keep it','keep'],['Demo: pretend it is 3 hours before','!late']])},
+ step(v,text){const w=waS(),x=w.x,d=D(),s=d.settings,a=d.appts.find(q=>q.id===x.id);if(!a)return;
+  const now=x.now||Date.now(),late=a.start-now<s.cancelWindow*36e5,until=a.start-s.cancelWindow*36e5,fee=Math.round(a.fee*s.latePct/100),t=(text||'').toLowerCase();
+  let k=v;
+  if(!k){if(w.st==='ask'){k=/cancel|nahi aa|won.?t come/.test(t)?'cn':/keep|no change/.test(t)?'keep':'mv'}
+    else if(w.st==='pick'){const wh=waWhen(text);if(wh.day!=null||wh.part||wh.mins!=null){wSlots('',a.type,wh);return}k='?'}
+    else if(w.st==='confirm')k=waYes(text)?'ok':waNo(text)?'more':'?';
+    else if(w.st==='cancel')k=waYes(text)?'cnc':waNo(text)?'keep':'?';
+    else k='?'}
+  if(k==='!late'){x.now=a.start-3*36e5;wSys(`Demo: pretending it is ${fD(x.now)}, ${fT(x.now)}, three hours before the session.`);this.ask(a);w.st='ask';return}
+  if(w.st==='ask'||(k==='mv'&&w.st!=='confirm')){
+    if(k==='mv'){
+      if(late){wIn(`Your session starts in under ${s.cancelWindow} hours. After that point I can’t move sessions myself, and a cancellation costs ${s.latePct}% of the fee, ${money(fee)}. Meera can decide on exceptions.`,[['Ask Meera to move it','askm'],['Keep my session','keep']]);w.st='late'}
+      else{const wh=waWhen(text||'');wSlots(`Free to move until ${fD(until)}, ${fT(until)}. Pick a time, or tell me what suits, like “Thursday evening”.`,a.type,(wh.day!=null||wh.part||wh.mins!=null)?wh:null);w.st='pick'}
+      return}
+    if(k==='cn'){
+      if(late){wIn(`That’s inside the ${s.cancelWindow}-hour window, so ${s.latePct}% of the fee, ${money(fee)}, applies. It’s in the policy you agreed to. Cancel anyway?`,[['Yes, cancel','cnc'],['Ask Meera first','askm'],['Keep my session','keep']])}
+      else wIn(`Cancel ${wWhen(a.start)}? There’s no fee.`,[['Yes, cancel','cnc'],['Keep my session','keep']]);
+      w.st='cancel';return}
+    if(k==='keep'){wIn('Kept. See you then.');w.st='done';return}
+  }
+  if(w.st==='pick'&&k&&k[0]==='s'){x.t=Number(k.slice(1));wIn(`Move to ${wWhen(x.t)}?`,[['Confirm','ok'],['Pick another','more']]);w.st='confirm';return}
+  if(w.st==='confirm'){
+    if(k==='ok'){a.start=x.t;a.reminded=false;a.movedAt=Date.now();a.isNew=true;save();
+      wIn(`Done. You’re booked for ${wWhen(a.start)}. You’ll get a reminder the evening before.`);
+      wSys(`Console: ${a.name} moved to ${fD(a.start)}, ${fT(a.start)}. It shows as a new booking in Appointments.`);w.st='done';return}
+    if(k==='more'){wSlots('Which time suits instead?',a.type,null);w.st='pick';return}}
+  if(k==='askm'){wIn('I’ve asked Meera. She’ll decide and reply here.');wSys(`Meera gets: “${a.name} asks to change ${fD(a.start)}, ${fT(a.start)}, inside the ${s.cancelWindow}-hour window. Approve or decline.”`);w.st='done';return}
+  if(k==='cnc'){cancelAppt(a,'Other',x.now);save();
+    wIn(`Cancelled. ${a.lateFee?`The late fee of ${money(a.lateFee)} applies, as in the policy.`:'No fee applies.'} You can book again any time by writing here.`);
+    wSys(`Console: ${fD(a.start)}, ${fT(a.start)} shows as cancelled${a.late?' (late)':''} and the time is open. Meera can offer it to the waitlist in one tap.`);w.st='done';return}
+  if(k==='keep'){wIn('Kept. See you then.');w.st='done';return}
+  if(w.st==='done'){wIn('Noted. Meera replies personally to anything else.');return}
+  unk()}};
+
+/* 2. A cancelled slot is offered down the waitlist */
+function wbOffer(){const w=waS(),x=w.x,d=D(),id=x.q.shift(),wl=id&&d.waitlist.find(q=>q.id===id);
+  if(!wl){wSys('Nobody else on the waitlist fits. The time stays open on Meera’s booking page.');w.st='done';return}
+  x.cur=wl.id;const ty=typeOf(wl.type);
+  wSys(`Message to ${wl.name}, ${wl.wa}. Sent as a template message, because it starts the chat.`);
+  wIn(`Hi ${firstName(wl.name)}, a time has opened with Meera: ${wWhen(x.slot)}. ${ty.name}, ${ty.min} min, ${money(ty.fee)}. It’s yours if you reply within 2 hours. Want it?`,[['Yes, book it','y'],['Not this time','n'],['Stop these messages','stop'],['Demo: 2 hours pass, no reply','!exp']]);w.st='offer'}
+WAH.backfill={
+ start(){const w=waS(),x=w.x,d=D();
+  const hits=q=>d.waitlist.filter(c=>wlMatches(c,q.start)).length;
+  const a=d.appts.filter(q=>q.status==='upcoming'&&!q.isNew&&q.start>Date.now()+2*DAY&&hits(q)).sort((p,q)=>hits(q)-hits(p)||p.start-q.start)[0];
+  if(!a){wSys('No upcoming session in the demo data fits anyone on the waitlist. Press Reset demo, then try again.');return}
+  x.slot=a.start;x.q=d.waitlist.filter(c=>wlMatches(c,a.start)).sort((p,q)=>p.joined-q.joined).map(c=>c.id);
+  cancelAppt(a,'Work or travel');save();
+  wSys(`${firstName(a.name)} cancelled ${wWhen(a.start)}, free of charge. The time is open and ${x.q.length} ${x.q.length===1?'person':'people'} on the waitlist fit${x.q.length===1?'s':''} it. The assistant asks them in the order they joined.`);
+  wbOffer()},
+ step(v,text){const w=waS(),x=w.x,d=D(),s=d.settings,wl=d.waitlist.find(q=>q.id===x.cur);
+  if(w.st!=='offer'||!wl){wIn('Noted. Meera replies personally to anything else.');return}
+  const k=v||(/stop/i.test(text)?'stop':waYes(text)?'y':waNo(text)?'n':'?');
+  if(k==='y'){waBook({name:wl.name,wa:wl.wa,type:wl.type,t:x.slot},{source:'From waitlist'});d.waitlist=d.waitlist.filter(q=>q.id!==wl.id);S.t.freed=null;save();
+    wIn(`Booked: ${wWhen(x.slot)}. A private form for consent and a few questions follows by link. You can move or cancel for free up to ${s.cancelWindow} hours before.`);
+    wSys(`Console: ${wl.name} booked from the waitlist and the time is filled. Waitlist now ${d.waitlist.length}.`);w.st='done';return}
+  if(k==='n'){wIn('No problem. You stay on the waitlist.');wbOffer();return}
+  if(k==='stop'){d.waitlist=d.waitlist.filter(q=>q.id!==wl.id);save();wIn('Done. You’re off the waitlist and I won’t message you about it again.');wbOffer();return}
+  if(k==='!exp'){wl.offered=Date.now();save();wSys('Two hours pass with no reply. The offer lapses and the next person is asked.');wbOffer();return}
+  unk()}};
+
+/* 3. A new enquiry at night */
+WAH.enquiry={
+ start(){const w=waS();wOut('Hi, I want to book a session');
+  wIn('Hi, you’ve reached '+ini()+' Practice. I’m an automated assistant for bookings. I can’t give advice, and Meera replies personally to anything else.\n\nPlease don’t share personal or health details in this chat.',[['Book a first session','book'],['Fees and languages','info'],['Talk to Meera','human']]);
+  wSys('It is late at night. Meera is offline and the assistant answers.');w.st='home'},
+ step(v,text){const w=waS(),x=w.x,d=D(),s=d.settings,langs=P().langs.split(',').map(q=>q.trim()).filter(Boolean);
+  let k=v;if(!k&&w.st!=='name'&&w.st!=='when'){k=/fee|price|cost|language/i.test(text)?'info':/meera|talk|call/i.test(text)?'human':'?'}
+  if(w.st==='home'||w.st==='info'){
+    if(k==='info'){wIn(d.types.map(q=>`${q.name}: ${q.min} min, ${money(q.fee)}`).join('\n')+`\n\nLanguages: ${P().langs}.\n${P().where}.`,[['Book a first session','book'],['Talk to Meera','human']]);w.st='info';return}
+    if(k==='human'){wIn('Okay, I’ll pass this to Meera. She usually replies within a few hours.');wSys('Meera sees: “New enquiry from '+WA_NUM+', would like to talk first.” The assistant stops until she replies.');w.st='done';return}
+    if(k==='book'){wIn('Which language would you like sessions in?',langs.map(q=>[q,'l:'+q]).concat([['Another language','l:other']]));w.st='lang';return}
+    unk();return}
+  if(w.st==='lang'){
+    if(k==='l:other'){wIn(`Meera works in ${P().langs}. I’ll ask her to suggest someone who works in your language.`);wSys('Meera sees: “Enquiry in a language you don’t offer. Suggest a colleague?”');w.st='done';return}
+    if(k&&k.slice(0,2)==='l:'){x.lang=k.slice(2);wIn('Online or in person?',[['Online','Online'],['In person','In person']]);w.st='mode';return}
+    unk();return}
+  if(w.st==='mode'){
+    if(k==='Online'||k==='In person'){x.mode=k;wIn(`Fees: a first session is ${money(typeOf('first').fee)} (${typeOf('first').min} min). A few reduced-fee sessions, ${money(typeOf('reduced').fee)}, are kept each week for students and anyone who needs them. Which fits you?`,[[`First session, ${money(typeOf('first').fee)}`,'first'],[`Reduced fee, ${money(typeOf('reduced').fee)}`,'reduced']]);w.st='fee';return}
+    unk();return}
+  if(w.st==='fee'){
+    if(k==='first'||k==='reduced'){x.type=k;wSlots('Which time suits? Pick one, or tell me, like “weekday evenings”.',k,null);w.st='when';return}
+    unk();return}
+  if(w.st==='when'){
+    if(k&&k[0]==='s'&&/^s\d+$/.test(k)){x.t=Number(k.slice(1));wIn('What name should I put on the booking? A first name is enough.');w.st='name';return}
+    const wh=waWhen(text||'');if(wh.day!=null||wh.part||wh.mins!=null){wSlots('',x.type,wh);return}
+    unk();return}
+  if(w.st==='name'){
+    x.name=String(text||'').replace(/[^\p{L} .'-]/gu,'').trim().slice(0,40)||'New client';const ty=typeOf(x.type);
+    wIn(`Thanks, ${firstName(x.name)}. Request sent: ${wWhen(x.t)}, ${ty.name.toLowerCase()}, ${x.mode.toLowerCase()}.\nMeera confirms new clients herself, usually within a few hours. I’ll message you here.`,[['Demo: Meera approves','!approve'],['Demo: Meera can’t fit it','!decline']]);
+    wSys(`Meera sees: “New request from ${x.name}: ${wWhen(x.t)}, ${ty.name}, ${x.mode}.” with Approve and Decline. No health details were collected.`);w.st='wait';return}
+  if(w.st==='wait'){
+    if(k==='!approve'){const a=waBook(x);
+      wIn(`Confirmed, ${firstName(x.name)}: ${wWhen(a.start)} with Meera. ${x.mode==='Online'?'The video link comes the evening before.':'It’s in person: '+P().where.replace(/^Online, and in person in /,'')+'.'}\n\nFree to move or cancel up to ${s.cancelWindow} hours before. A private form for consent and a few questions follows by link. Please keep those answers out of this chat.`);
+      wSys('Console: the appointment is added and marked as a new booking.');w.st='done';return}
+    if(k==='!decline'){d.waitlist.push({id:'w'+Date.now(),name:x.name,wa:WA_NUM,days:'Any day',times:'Any time',type:x.type,joined:Date.now(),source:'WhatsApp',offered:null});save();
+      wIn('Meera can’t fit that time right now. I’ve put you on her waitlist, and she or I will message you here when something opens. Reply STOP any time to be removed.');
+      wSys('Console: '+x.name+' is on the waitlist.');w.st='done';return}
+    unk();return}
+  wIn('Noted. Meera replies personally to anything else.')}};
+
+/* 4. The therapist runs her diary from the same app */
+function therConfirmMove(x){const a=D().appts.find(q=>q.id===x.mvA);
+  wIn(`Move ${nm(a.name)} from ${fD(a.start)}, ${fT(a.start)} to ${wWhen(x.t)}? I’ll message ${firstName(a.name)} the new time.`,[['Yes, move and tell them','ok'],['No','no']]);waS().st='confirm'}
+function therCmd(text){const w=waS(),x=w.x,d=D(),t=text.toLowerCase().replace(/’/g,"'"),wh=waWhen(text);
+  if(/\bblock\b/.test(t)){
+    if(wh.day==null){wIn('Which day? Try “Block Friday evening”.');return}
+    let f='09:00',e='21:00';const rg=t.match(/(\d{1,2})(?::(\d{2}))?\s*(am|pm)?\s*(?:to|-|till|until)\s*(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/);
+    if(rg){f=waHM(waHour(rg[1],rg[3]),rg[2]);e=waHM(waHour(rg[4],rg[6]),rg[5])}else if(wh.part==='eve'){f='17:00';e='20:00'}else if(wh.part==='am'){f='10:00';e='13:00'}
+    const c=d.appts.filter(a=>a.status==='upcoming'&&a.start<at(wh.day,e)&&a.start+a.dur*6e4>at(wh.day,f));
+    x.blk={day:wh.day,f,e};
+    wIn(`Block ${fDL(wh.day)}, ${hmLabel(f)} to ${hmLabel(e)}? ${c.length?`${c.length} session${c.length>1?'s':''} fall in that time: ${c.map(a=>nm(a.name)+' at '+fT(a.start)).join(', ')}. They stay booked unless you tell them.`:'Nothing is booked then.'}`,
+      [['Block it','bk']].concat(c.length?[['Block it and tell them','bkm']]:[]).concat([['No','no']]));x.blkc=c.map(a=>a.id);w.st='confirm';return}
+  if(/\b(move|shift|reschedule|badal)\b/.test(t)){
+    const names=[...new Set(d.appts.filter(a=>a.status==='upcoming'&&a.start>Date.now()).map(a=>a.name))],who=names.find(n=>t.includes(firstName(n).toLowerCase()));
+    if(!who){wIn('Which client? Try “Move Vikram to Thursday 5”.');return}
+    if(wh.day==null){wIn(`Which day for ${firstName(who)}? Try “Move ${firstName(who)} to Thursday 5”.`);return}
+    const a=firstUp(d,who),f=waFind(a.type,wh,6);x.mvA=a.id;
+    if(wh.mins!=null&&f.length){x.t=f[0];therConfirmMove(x);return}
+    wIn(f.length?`Open times for ${firstName(who)} then:`:`Nothing is open then. The nearest times for ${firstName(who)}:`,wSlotOpts(f.length?f:nextFree(a.type,5)));w.st='pick';return}
+  if(/\b(who|today|tomorrow|schedule|diary|kal|aaj)\b/.test(t)){
+    const day=wh.day!=null?wh.day:T0,list=d.appts.filter(a=>a.status==='upcoming'&&dayStart(a.start)===day).sort((p,q)=>p.start-q.start);
+    wIn(list.length?`${fDL(day)}: ${list.length} session${list.length>1?'s':''}.\n`+list.map(a=>`${fT(a.start)}  ${nm(a.name)}, ${typeOf(a.type).name.toLowerCase()}${a.mode==='In person'?', in person':''}`).join('\n'):`${fDL(day)}: nothing booked.`);return}
+  wIn('I can tell you who’s coming, move a session, or block time. For example “Who’s tomorrow?”, “Move Vikram to Thursday 5” or “Block Friday evening”.')}
+WAH.ther={
+ start(){const w=waS();wIn('Hi Meera. I can tell you who’s coming, move or block time, and tell clients for you. Type, tap, or send a voice note. I always ask before I change anything.',[['Who’s tomorrow?','q:Who’s tomorrow?'],['Move Vikram to Thursday 5','q:Move Vikram to Thursday 5'],['Block Friday evening','q:Block Friday evening'],['Voice note, in Hinglish','voice']]);w.st='cmd'},
+ step(v,text){const w=waS(),x=w.x,d=D();let t0=text;
+  if(v==='voice'){const m=w.msgs[w.msgs.length-1];m.voice=true;m.t=WA_VOICE;wIn('I heard: “'+WA_VOICE+'”');t0=WA_VOICE}
+  else if(v&&v.slice(0,2)==='q:')t0=v.slice(2);
+  else if(v==='no'){wIn('Okay, nothing changed.');w.st='cmd';return}
+  else if(v==='ok'&&x.mvA){const a=d.appts.find(q=>q.id===x.mvA);a.start=x.t;a.reminded=false;a.movedAt=Date.now();a.isNew=true;save();const f=firstName(a.name);
+    wIn(`Done. ${nm(a.name)} is now ${wWhen(a.start)}.`);wSys(`Sent to ${f}: “Hi ${f}, this is Meera. I’ve moved your session to ${wWhen(a.start)}. Reply here if that doesn’t work.”`);x.mvA=null;w.st='cmd';return}
+  else if((v==='bk'||v==='bkm')&&x.blk){d.blocks.push({id:'b'+Date.now(),date:x.blk.day,from:x.blk.f,to:x.blk.e,note:'Blocked from WhatsApp'});save();
+    wIn(`Blocked ${fDL(x.blk.day)}, ${hmLabel(x.blk.f)} to ${hmLabel(x.blk.e)}. It’s off your booking page now.`);
+    if(v==='bkm')(x.blkc||[]).forEach(id=>{const a=d.appts.find(q=>q.id===id);if(a)wSys(`Sent to ${firstName(a.name)}: “Hi ${firstName(a.name)}, Meera needs to free up ${fD(a.start)}. Reply MOVE and I’ll show you other times.”`)});
+    x.blk=null;w.st='cmd';return}
+  else if(v&&/^s\d+$/.test(v)&&x.mvA){x.t=Number(v.slice(1));therConfirmMove(x);return}
+  else if(v){unk();return}
+  therCmd(t0||'')}};
+
+/* 5. Booking for someone else */
+WAH.family={
+ start(){const w=waS();wOut('Hi, I’d like to book a session for someone in my family.');
+  wIn('Hi, thanks for writing. I’m an automated assistant for bookings. Who is the session for?',[['My child or teenager','child'],['My partner or another adult','adult']]);w.st='who'},
+ step(v,text){const w=waS(),x=w.x,d=D(),s=d.settings;let k=v;
+  if(!k&&['who','guard','await'].includes(w.st))k=/child|son|daughter|teen|beta|beti/i.test(text)?'child':/partner|wife|husband|adult|friend/i.test(text)?'adult':waYes(text)?'g':waNo(text)?'ng':'?';
+  if(w.st==='who'){
+    if(k==='child'){
+      if(!s.minors){wIn('Meera isn’t seeing clients under 18 right now. I can pass your details to her so she can suggest someone.');w.st='done';return}
+      wIn('Meera sees clients under 18, with a parent or guardian’s consent before the first session. Are you their parent or legal guardian?',[['Yes, I am','g'],['No, I’m not','ng']]);w.st='guard';return}
+    if(k==='adult'){wIn('Adults book for themselves, so I need their agreement first. What’s their WhatsApp number? I’ll send one neutral message, and I won’t say who asked or why.');w.st='anum';return}
+    unk();return}
+  if(w.st==='guard'){
+    if(k==='ng'){wIn('Then the child’s parent or guardian needs to book, or agree first. Meera can’t start without them.');w.st='done';return}
+    if(k==='g'){wIn('Thank you. What’s your name, and how are you related? For example “Sunita, mother”.');w.st='gname';return}
+    unk();return}
+  if(w.st==='gname'){const p=String(text).split(',').map(q=>q.trim());x.g={name:p[0]||'Parent',rel:p[1]||'Parent or guardian',wa:WA_NUM};
+    wIn('And the child’s first name? Please keep the reason out of this chat. Meera asks on a private form.');w.st='cname';return}
+  if(w.st==='cname'){x.child=String(text).replace(/[^\p{L} .'-]/gu,'').trim().split(/\s+/)[0]||'Child';x.type='first';wSlots(`Pick a time for ${x.child}’s first session.`,'first',null);w.st='when';return}
+  if(w.st==='when'||w.st==='awhen'){
+    if(k&&/^s\d+$/.test(k)){x.t=Number(k.slice(1));
+      if(w.st==='when')wIn(`Book ${wWhen(x.t)} for ${x.child}?\nBy booking, you agree as ${x.child}’s ${x.g.rel.toLowerCase()}. The consent form comes to this number as a private link.`,[['Yes, I agree and book','ok'],['Pick another','more']]);
+      else wIn(`Book ${wWhen(x.t)}?`,[['Yes, book it','aok'],['Pick another','more']]);
+      w.st=w.st==='when'?'confirm':'aconfirm';return}
+    const wh=waWhen(text||'');if(wh.day!=null||wh.part||wh.mins!=null){wSlots('',x.type,wh);return}
+    unk();return}
+  if(w.st==='confirm'){
+    if(k==='ok'||(!k&&waYes(text))){const last=(x.g.name.split(/\s+/)[1]||'');x.name=(x.child+' '+last).trim();
+      waBook(x,{guardian:x.g,consentAt:Date.now()});
+      wIn(`Booked: ${wWhen(x.t)} for ${x.child}. You’ll get the consent form here as a private link, and a reminder the evening before.`);
+      wSys(`Console: ${x.name} is booked. Guardian ${x.g.name} (${x.g.rel}) is recorded, and Meera sees “Under 18: guardian consent needed”.`);w.st='done';return}
+    if(k==='more'){wSlots('Which time suits instead?','first',null);w.st='when';return}
+    unk();return}
+  if(w.st==='anum'){const n=String(text).replace(/\D/g,'').slice(-10);
+    if(n.length!==10){wIn('Please send a 10-digit mobile number.');return}
+    x.num=n;wSys(`Sent to +91 ${n.slice(0,5)} ${n.slice(5)}: “Hi, this is ${ini()} Practice. Someone gave us this number to arrange an appointment with Meera. Reply YES to go ahead. If you ignore this, we’ll delete your number.”`);
+    wIn('Done. I’ve messaged them. If they say yes, they’ll choose their own time. I won’t share anything more with you, because the sessions are theirs.',[['Demo: they reply YES','!yes']]);w.st='await';return}
+  if(w.st==='await'){
+    if(k==='!yes'){wSys('The chat now continues with the other person.');wOut('YES');wIn('Thanks. What name should I put on the booking?');w.st='aname';return}
+    unk();return}
+  if(w.st==='aname'){x.name=String(text).replace(/[^\p{L} .'-]/gu,'').trim().slice(0,40)||'Guest';x.type='first';x.wa='+91 '+x.num.slice(0,5)+' '+x.num.slice(5);wSlots('Which time suits? Pick one, or tell me, like “weekday evenings”.','first',null);w.st='awhen';return}
+  if(w.st==='aconfirm'){
+    if(k==='aok'){waBook(x);wIn(`Booked: ${wWhen(x.t)}. A private form for consent and a few questions follows by link. You can move or cancel for free up to ${s.cancelWindow} hours before.`);wSys('Console: the booking is under their own name and number. The person who asked sees nothing of it.');w.st='done';return}
+    if(k==='more'){wSlots('Which time suits instead?','first',null);w.st='awhen';return}
+    unk();return}
+  wIn('Noted. Meera replies personally to anything else.')}};
+
+/* 6. Pay to confirm */
+WAH.pay={
+ start(){const w=waS(),a=D().appts.find(q=>q.name==='Riya Menon');wOut('Hi, can I book Thursday evening?');w.x.name='Riya Menon';w.x.type='follow';w.x.wa=a?a.wa:WA_NUM;
+  const ty=typeOf('follow');wIn(`Hi Riya. A follow-up session is ${ty.min} min, ${money(ty.fee)}.`);
+  wSlots('',ty.id,waWhen('Thursday evening'));w.st='when'},
+ step(v,text){const w=waS(),x=w.x,d=D(),s=d.settings,ty=typeOf(x.type);let k=v;
+  if(!k&&w.st==='when'){const wh=waWhen(text||'');if(wh.day!=null||wh.part||wh.mins!=null){wSlots('',x.type,wh);return}}
+  if(w.st==='when'||w.st==='again'){
+    if(k&&/^s\d+$/.test(k)){x.t=Number(k.slice(1));
+      wIn(`I’ve held ${wWhen(x.t)} for you for 15 minutes. To confirm it, pay ${money(ty.fee)} by UPI to ${s.upi}.`,[[`Pay ${money(ty.fee)} by UPI`,'pay'],['Demo: 15 minutes pass','!exp']]);w.st='hold';return}
+    if(k==='again'){wSlots('Which time suits?',x.type,null);w.st='when';return}
+    unk();return}
+  if(w.st==='hold'){
+    if(k==='pay'||(!k&&/pay|upi|done|paid/i.test(text))){wSys('Your UPI app opens with the amount and Meera’s UPI ID filled in. In this demo, imagine paying.');
+      wIn('Once it’s paid, send me the 12-digit transaction ID (UTR) from your UPI app.',[['Demo: 15 minutes pass','!exp']]);w.st='utr';return}
+    if(k==='!exp'){this.expire();return}
+    unk();return}
+  if(w.st==='utr'){
+    if(k==='!exp'){this.expire();return}
+    const u=String(text||'').replace(/\s/g,'');
+    if(/^\d{12}$/.test(u)){const a=waBook(x,{claimed:true,claimUtr:u});
+      wIn(`Thank you. ${wWhen(a.start)} is booked. Meera checks the payment against her bank and marks it paid. If it doesn’t show, she’ll message you.`);
+      wSys(`Console: booked, with payment claimed under UTR ${u}. Meera confirms it under Payments. Without a payment gateway, WhatsApp can’t see the money arrive.`);w.st='done';return}
+    wIn('A UTR has 12 digits. You’ll find it in your UPI app, in the payment details.');return}
+  wIn('Noted. Meera replies personally to anything else.')},
+ expire(){const w=waS();wSys('15 minutes pass and no payment arrives.');wIn(`The hold on ${wWhen(w.x.t)} has ended and the time is open for others again. Want to try another time?`,[['Pick another time','again']]);w.st='again'}};
+
+/* chat view */
+function waMsg(m,active){
+  if(m.w==='sys')return `<div class="was">${esc(m.t)}</div>`;
+  const body=m.voice?`<span class="wvo" role="img" aria-label="Voice note, 6 seconds"><i aria-hidden="true">▶</i><span class="wbars" aria-hidden="true"></span><small>0:06</small></span>`:esc(m.t);
+  let h=`<div class="wab ${m.w==='in'?'bot':'me'}">${body}<span class="wat">${esc(m.at||'')}${m.w==='out'?'<span aria-hidden="true"> ✓✓</span>':''}</span></div>`;
+  if(m.o&&active&&m.o.length)h+=`<div class="waq">${m.o.map(([l,v])=>`<button type="button"${v[0]==='!'?' class="demo"':''} data-a="waPick" data-v="${esc(v)}" data-l="${esc(l)}">${esc(l)}</button>`).join('')}</div>`;
+  return h}
+function waStage(){const w=waS();
+  if(!w.sc){waEnter();waStart('resched')}
+  const sc=WAS.find(q=>q[0]===w.sc),ther=w.sc==='ther';
+  let last=-1;for(let i=w.msgs.length-1;i>=0;i--){const m=w.msgs[i];if(m.w==='out')break;if(m.o){last=i;break}}
+  return `<div class="wastage"><aside class="wanav" aria-label="WhatsApp scenarios"><h2>WhatsApp booking</h2>
+   <p class="muted">Six ways one chat number can run a practice. Pick one and play it through. Everything here uses the demo data, so the Therapist view shows what each chat changed. Nothing is sent.</p>
+   <div class="wasc" role="group" aria-label="Scenario">${WAS.map((q,i)=>`<button type="button" class="wasb" data-a="waSc" data-v="${q[0]}" aria-pressed="${q[0]===w.sc}"><b>${i+1}. ${esc(q[1])}</b><span>${esc(q[2])}</span></button>`).join('')}</div>
+   <div class="wawhy"><b>Limit of this one</b><span>${esc(sc[3])}</span><b>In every chat</b><span>Typed words about self-harm stop the flow, show Tele-MANAS (14416) and alert Meera. The display name carries no clinical words.</span></div></aside>
+  <div class="phone"><div class="win m wa"><div class="sbar" aria-hidden="true"><span>9:41</span><span class="isl"></span><span>100%</span></div>
+   <header class="wah"><span class="waav" aria-hidden="true">${ther?'✦':esc(ini())}</span><span><b>${ther?'Practice assistant':esc(ini())+' Practice'}</b><small>${ther?'Talking to Meera':'Business account'}</small></span><button type="button" class="wahb" data-a="waRestart">Restart</button></header>
+   <div class="wamsgs" role="log" aria-label="Chat">${w.msgs.map((m,i)=>waMsg(m,i===last&&!w.halt)).join('')}</div>
+   <form class="waf" data-form="wa"><input id="wain" class="wain" type="text" placeholder="Message" aria-label="Type a message" autocomplete="off" enterkeyhint="send"><button type="submit" class="wasend" data-a="waSend" aria-label="Send">➤</button></form></div></div></div>`}
 
 /* hash routing */
 function setHash(){if(LIVE)return;const h=S.view+'-'+S.device;if(location.hash!=='#'+h){try{history.replaceState(null,'','#'+h)}catch(e){location.hash=h}}}
-function readHash(){if(LIVE){S.view=LIVE;S.device=window.innerWidth<700?'phone':'desktop';return}const m=/^#(client|therapist)-(desktop|phone)$/.exec(location.hash);if(m){S.view=m[1];S.device=m[2]}else{S.device=window.innerWidth<640?'phone':'desktop';if(DEMO)S.view='therapist'}}
+function readHash(){if(LIVE){S.view=LIVE;S.device=window.innerWidth<700?'phone':'desktop';return}const m=/^#(client|therapist|whatsapp)-(desktop|phone)$/.exec(location.hash);if(m){S.view=m[1]==='whatsapp'&&!DEMO?'client':m[1];S.device=m[2]}else{S.device=window.innerWidth<640?'phone':'desktop';if(DEMO)S.view='therapist'}}
 window.addEventListener('hashchange',()=>{readHash();S.modal=null;render()});
 if(LIVE){document.body.classList.add('live');document.getElementById('livebar').hidden=!!SB||!!SLUG;if(LIVE==='therapist'&&!SB)document.getElementById('livereset').hidden=false;
   window.addEventListener('resize',()=>{const dv=window.innerWidth<700?'phone':'desktop';if(dv!==S.device){S.device=dv;S.modal=null;render()}});
@@ -1566,6 +1916,7 @@ if(SB){S.auth=false;
   setInterval(sbInbox,45000);document.addEventListener('visibilitychange',()=>{if(!document.hidden)sbInbox()});
 }
 if(SLUG)pubLoad();
+if(!DEMO){const wb=document.getElementById('wabtn');if(wb)wb.remove()}
 readHash();render();
 // Update check: a page left open (or a Home Screen icon) keeps running the code it loaded. Look for a newer build
 // now and then; reload when that is safe, otherwise show a bar so nothing the person is typing is lost.

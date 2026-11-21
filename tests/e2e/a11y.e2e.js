@@ -9,7 +9,7 @@ const srv = http.createServer((q, r) => { let u = q.url.split('?')[0].split('#')
 const R = []; const ok = (n, c, x) => R.push([c ? 'PASS' : 'FAIL', n, x || ''].join(' | '));
 (async () => {
   await new Promise((r) => srv.listen(8798, r)); const br = await chromium.launch(); const B = 'http://localhost:8798';
-  for (const [name, vp, url] of [['demo console, phone', { width: 390, height: 844 }, '/demo#therapist-phone'], ['demo console, desktop', { width: 1200, height: 850 }, '/demo#therapist-desktop'], ['booking page, phone', { width: 390, height: 844 }, '/demo#client-phone'], ['booking page, desktop', { width: 1200, height: 850 }, '/demo#client-desktop'], ['404 page', { width: 390, height: 844 }, '/404.html']]) {
+  for (const [name, vp, url] of [['demo console, phone', { width: 390, height: 844 }, '/demo#therapist-phone'], ['demo console, desktop', { width: 1200, height: 850 }, '/demo#therapist-desktop'], ['booking page, phone', { width: 390, height: 844 }, '/demo#client-phone'], ['booking page, desktop', { width: 1200, height: 850 }, '/demo#client-desktop'], ['WhatsApp demo, phone', { width: 390, height: 844 }, '/demo#whatsapp-phone'], ['WhatsApp demo, desktop', { width: 1200, height: 850 }, '/demo#whatsapp-desktop'], ['404 page', { width: 390, height: 844 }, '/404.html']]) {
     const ctx = await br.newContext({ viewport: vp }); const pg = await ctx.newPage(); await pg.goto(B + url); await pg.waitForTimeout(700);
     await pg.evaluate(AX); const v = await pg.evaluate(async () => (await axe.run(document, { runOnly: ['wcag2a', 'wcag2aa', 'wcag21aa'] })).violations.map((x) => x.id + '(' + x.nodes.length + ')'));
     ok(name + ': no accessibility violations', v.length === 0, v.join(', ')); await ctx.close();
